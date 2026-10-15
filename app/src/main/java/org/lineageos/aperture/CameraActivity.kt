@@ -370,10 +370,7 @@ open class CameraActivity : AppCompatActivity(R.layout.activity_camera) {
         enableEdgeToEdge()
 
         // Hide the status bars
-        window.updateBarsVisibility(
-            WindowInsetsControllerCompat.BEHAVIOR_DEFAULT,
-            statusBars = false,
-        )
+        hideStatusBars()
 
         // Force dark navigation bar
         WindowCompat.getInsetsController(window, window.decorView)
@@ -630,6 +627,25 @@ open class CameraActivity : AppCompatActivity(R.layout.activity_camera) {
         lifecycleScope.launch {
             queueSetupWithCameraPermissions()
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        hideStatusBars()
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) {
+            hideStatusBars()
+        }
+    }
+
+    private fun hideStatusBars() {
+        window.updateBarsVisibility(
+            WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE,
+            statusBars = false,
+        )
     }
 
     override fun onDestroy() {
