@@ -293,4 +293,16 @@
     <string name="bb_filter_gild">Gild</string>
     <string name="bb_filter_infrared">Infrared</string>
     <string name="bb_filter_protea">Protea</string>
+
+    <!-- Updates -->
+    <string name="bb_about_header">Updates</string>
+    <string name="bb_check_updates_title">Check for updates</string>
+    <string name="bb_check_updates_summary">Check GitHub for new versions</string>
+    <string name="bb_update_available_title">Update available</string>
+    <string name="bb_update_available_message">Version %1$s is available. Do you want to download and install it?</string>
+    <string name="bb_update_download">Download</string>
+    <string name="bb_update_later">Later</string>
+    <string name="bb_update_latest">You are using the latest version (%1$s)</string>
+    <string name="bb_update_checking">Checking for updates…</string>
+    <string name="bb_update_error">Could not check for updates</string>
 </resources>

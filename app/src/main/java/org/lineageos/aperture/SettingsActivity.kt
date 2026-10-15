@@ -38,6 +38,7 @@ import org.lineageos.aperture.models.Permission
 import org.lineageos.aperture.models.PermissionState
 import org.lineageos.aperture.repositories.PreferencesRepository.Companion.preferenceStringToGestureAction
 import org.lineageos.aperture.repositories.PreferencesRepository.Companion.sharedPreferencesKeyPrefix
+import org.lineageos.aperture.utils.UpdateChecker
 import org.lineageos.aperture.repositories.PreferencesRepository.Companion.toPreferenceString
 import org.lineageos.aperture.utils.CameraSoundsUtils
 import org.lineageos.aperture.utils.PermissionsManager
@@ -210,6 +211,27 @@ class SettingsActivity : AppCompatActivity(R.layout.activity_settings) {
             // Photo capture mode
             photoCaptureMode.onPreferenceChangeListener = photoCaptureModePreferenceChangeListener
             enableZsl.isEnabled = photoCaptureMode.value == "minimize_latency"
+
+            // Check updates
+            findPreference<Preference>("check_updates")?.apply {
+                summary = "v${BuildConfig.VERSION_NAME} — ${getString(R.string.bb_check_updates_summary)}"
+                onPreferenceClickListener = Preference.OnPreferenceClickListener {
+                    Toast.makeText(requireContext(), getString(R.string.bb_update_checking), Toast.LENGTH_SHORT).show()
+                    viewLifecycleOwner.lifecycleScope.launch {
+                        val update = UpdateChecker.checkUpdate(BuildConfig.VERSION_NAME)
+                        if (update != null) {
+                            UpdateChecker.showUpdateDialog(requireContext(), update)
+                        } else {
+                            Toast.makeText(
+                                requireContext(),
+                                getString(R.string.bb_update_latest, BuildConfig.VERSION_NAME),
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        }
+                    }
+                    true
+                }
+            }
         }
     }
 

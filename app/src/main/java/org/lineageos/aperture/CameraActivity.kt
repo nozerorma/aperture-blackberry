@@ -48,6 +48,7 @@ import android.graphics.ColorMatrix
 import android.graphics.ColorMatrixColorFilter
 import android.graphics.RenderEffect
 import android.graphics.Typeface
+import android.graphics.drawable.Drawable
 import android.util.Size
 import android.view.Gravity
 import java.util.Locale
@@ -907,6 +908,15 @@ open class CameraActivity : AppCompatActivity(R.layout.activity_camera) {
 
         // Initialize BlackBerry Camera UI
         setupBbUi()
+
+        // Check for updates
+        lifecycleScope.launch {
+            kotlinx.coroutines.delay(2500)
+            val update = org.lineageos.aperture.utils.UpdateChecker.checkUpdate(BuildConfig.VERSION_NAME)
+            if (update != null && !isFinishing && !isDestroyed) {
+                org.lineageos.aperture.utils.UpdateChecker.showUpdateDialog(this@CameraActivity, update)
+            }
+        }
 
         lifecycleScope.launch {
             lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
@@ -1965,6 +1975,16 @@ open class CameraActivity : AppCompatActivity(R.layout.activity_camera) {
         }
     }
 
+    private fun getScaledSubmenuDrawable(iconRes: Int, isSelected: Boolean): Drawable? {
+        val iconHeight = 16.px
+        return ContextCompat.getDrawable(this, iconRes)?.mutate()?.apply {
+            val aspect = intrinsicWidth.toFloat() / intrinsicHeight.toFloat().coerceAtLeast(1f)
+            val iconWidth = (iconHeight * aspect).toInt()
+            setBounds(0, 0, iconWidth, iconHeight)
+            setTint(if (isSelected) Color.BLACK else Color.WHITE)
+        }
+    }
+
     private fun showFlashSubmenu() {
         llBbSubmenu.removeAllViews()
         llBbSubmenu.tag = "flash"
@@ -1999,8 +2019,8 @@ open class CameraActivity : AppCompatActivity(R.layout.activity_camera) {
                 backgroundTintList = ColorStateList.valueOf(
                     if (isSelected) Color.WHITE else Color.parseColor("#33FFFFFF")
                 )
-                setCompoundDrawablesWithIntrinsicBounds(iconRes, 0, 0, 0)
-                compoundDrawableTintList = ColorStateList.valueOf(if (isSelected) Color.BLACK else Color.WHITE)
+                val iconDrawable = getScaledSubmenuDrawable(iconRes, isSelected)
+                setCompoundDrawables(iconDrawable, null, null, null)
                 compoundDrawablePadding = 4.px
                 gravity = Gravity.CENTER
                 setPadding(8.px, 2.px, 8.px, 2.px)
@@ -2050,8 +2070,8 @@ open class CameraActivity : AppCompatActivity(R.layout.activity_camera) {
                 backgroundTintList = ColorStateList.valueOf(
                     if (isSelected) Color.WHITE else Color.parseColor("#33FFFFFF")
                 )
-                setCompoundDrawablesWithIntrinsicBounds(iconRes, 0, 0, 0)
-                compoundDrawableTintList = ColorStateList.valueOf(if (isSelected) Color.BLACK else Color.WHITE)
+                val iconDrawable = getScaledSubmenuDrawable(iconRes, isSelected)
+                setCompoundDrawables(iconDrawable, null, null, null)
                 compoundDrawablePadding = 4.px
                 gravity = Gravity.CENTER
                 setPadding(8.px, 2.px, 8.px, 2.px)
@@ -2347,8 +2367,8 @@ open class CameraActivity : AppCompatActivity(R.layout.activity_camera) {
                 backgroundTintList = ColorStateList.valueOf(
                     if (isSelected) Color.WHITE else Color.parseColor("#33FFFFFF")
                 )
-                setCompoundDrawablesWithIntrinsicBounds(iconRes, 0, 0, 0)
-                compoundDrawableTintList = ColorStateList.valueOf(if (isSelected) Color.BLACK else Color.WHITE)
+                val iconDrawable = getScaledSubmenuDrawable(iconRes, isSelected)
+                setCompoundDrawables(iconDrawable, null, null, null)
                 compoundDrawablePadding = 4.px
                 gravity = Gravity.CENTER
                 setPadding(8.px, 2.px, 8.px, 2.px)

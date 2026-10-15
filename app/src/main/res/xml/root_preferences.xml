@@ -128,4 +128,16 @@
 
     </PreferenceCategory>
 
+    <PreferenceCategory
+        app:iconSpaceReserved="false"
+        app:title="@string/bb_about_header">
+
+        <Preference
+            app:icon="@drawable/ic_system_update"
+            app:key="check_updates"
+            app:summary="@string/bb_check_updates_summary"
+            app:title="@string/bb_check_updates_title" />
+
+    </PreferenceCategory>
+
 </PreferenceScreen>

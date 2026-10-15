@@ -226,4 +226,16 @@
     <string name="bb_filter_gild">Gild</string>
     <string name="bb_filter_infrared">Infrarrojo</string>
     <string name="bb_filter_protea">Protea</string>
+
+    <!-- Updates -->
+    <string name="bb_about_header">Actualizaciones</string>
+    <string name="bb_check_updates_title">Buscar actualizaciones</string>
+    <string name="bb_check_updates_summary">Comprobar nuevas versiones en GitHub</string>
+    <string name="bb_update_available_title">Actualización disponible</string>
+    <string name="bb_update_available_message">La versión %1$s está disponible. ¿Deseas descargarla e instalarla?</string>
+    <string name="bb_update_download">Descargar</string>
+    <string name="bb_update_later">Más tarde</string>
+    <string name="bb_update_latest">Ya tienes la última versión (%1$s)</string>
+    <string name="bb_update_checking">Buscando actualizaciones…</string>
+    <string name="bb_update_error">No se pudo comprobar actualizaciones</string>
 </resources>
