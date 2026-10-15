@@ -1939,129 +1939,187 @@ open class CameraActivity : AppCompatActivity(R.layout.activity_camera) {
         }
     }
 
+    override fun onTrackballEvent(event: MotionEvent): Boolean {
+        if (event.action == MotionEvent.ACTION_MOVE) {
+            val deltaY = event.y
+            if (Math.abs(deltaY) > 0.1f) {
+                if (deltaY < 0) {
+                    viewModel.zoomIn()
+                } else {
+                    viewModel.zoomOut()
+                }
+                return true
+            }
+        }
+        return super.onTrackballEvent(event)
+    }
+
     private fun handleHardwareKeyDown(
         keyCode: Int, event: KeyEvent?
-    ) = HardwareKey.match(keyCode)?.let { (hardwareKey, tempIncrease) ->
-        val increase = when (viewModel.getHardwareKeyInvert(hardwareKey)) {
-            true -> !tempIncrease
-            false -> tempIncrease
-        }
-
-        val gestureAction = viewModel.getHardwareKeyAction(hardwareKey)
-
-        if (gestureAction.isTwoWayAction && !hardwareKey.isTwoWayKey) {
-            Log.wtf(
-                LOG_TAG,
-                "${gestureAction.name} requires two-way key but ${hardwareKey.name} is not"
-            )
-            return@let true
-        }
-
-        when (gestureAction) {
-            GestureAction.SHUTTER -> {
+    ): Boolean? {
+        when (keyCode) {
+            KeyEvent.KEYCODE_SPACE,
+            KeyEvent.KEYCODE_ENTER,
+            KeyEvent.KEYCODE_NUMPAD_ENTER,
+            KeyEvent.KEYCODE_DPAD_CENTER -> {
                 if (viewModel.cameraMode.value == CameraMode.VIDEO
                     && viewModel.isShutterButtonEnabled.value
                     && event?.repeatCount == 0
                 ) {
                     shutterButton.performClick()
                 }
-                true
+                return true
             }
 
-            GestureAction.FOCUS -> {
-                if (event?.repeatCount == 0) {
-                    viewFinderTouchEvent = null
-                    viewFinder.performClick()
-                }
-                true
+            KeyEvent.KEYCODE_DPAD_UP -> {
+                viewModel.zoomIn()
+                return true
             }
 
-            GestureAction.MIC_MUTE -> {
-                if (viewModel.cameraMode.value == CameraMode.VIDEO && micButton.isEnabled &&
-                    event?.repeatCount == 0
-                ) {
-                    viewModel.toggleVideoMicrophoneEnabled()
-                }
-                true
+            KeyEvent.KEYCODE_DPAD_DOWN -> {
+                viewModel.zoomOut()
+                return true
+            }
+        }
+
+        return HardwareKey.match(keyCode)?.let { (hardwareKey, tempIncrease) ->
+            val increase = when (viewModel.getHardwareKeyInvert(hardwareKey)) {
+                true -> !tempIncrease
+                false -> tempIncrease
             }
 
-            GestureAction.ZOOM -> {
-                when (increase) {
-                    true -> viewModel.zoomIn()
-                    false -> viewModel.zoomOut()
-                }
-                true
+            val gestureAction = viewModel.getHardwareKeyAction(hardwareKey)
+
+            if (gestureAction.isTwoWayAction && !hardwareKey.isTwoWayKey) {
+                Log.wtf(
+                    LOG_TAG,
+                    "${gestureAction.name} requires two-way key but ${hardwareKey.name} is not"
+                )
+                return@let true
             }
 
-            GestureAction.DEFAULT -> {
-                if (hardwareKey.supportsDefault) {
-                    super.onKeyDown(keyCode, event)
-                } else {
-                    Log.wtf(
-                        LOG_TAG,
-                        "Got GestureAction.DEFAULT for ${hardwareKey.name} which doesn't support it"
-                    )
+            when (gestureAction) {
+                GestureAction.SHUTTER -> {
+                    if (viewModel.cameraMode.value == CameraMode.VIDEO
+                        && viewModel.isShutterButtonEnabled.value
+                        && event?.repeatCount == 0
+                    ) {
+                        shutterButton.performClick()
+                    }
                     true
                 }
-            }
 
-            GestureAction.NOTHING -> {
-                // Do nothing
-                true
+                GestureAction.FOCUS -> {
+                    if (event?.repeatCount == 0) {
+                        viewFinderTouchEvent = null
+                        viewFinder.performClick()
+                    }
+                    true
+                }
+
+                GestureAction.MIC_MUTE -> {
+                    if (viewModel.cameraMode.value == CameraMode.VIDEO && micButton.isEnabled &&
+                        event?.repeatCount == 0
+                    ) {
+                        viewModel.toggleVideoMicrophoneEnabled()
+                    }
+                    true
+                }
+
+                GestureAction.ZOOM -> {
+                    when (increase) {
+                        true -> viewModel.zoomIn()
+                        false -> viewModel.zoomOut()
+                    }
+                    true
+                }
+
+                GestureAction.DEFAULT -> {
+                    if (hardwareKey.supportsDefault) {
+                        super.onKeyDown(keyCode, event)
+                    } else {
+                        Log.wtf(
+                            LOG_TAG,
+                            "Got GestureAction.DEFAULT for ${hardwareKey.name} which doesn't support it"
+                        )
+                        true
+                    }
+                }
+
+                GestureAction.NOTHING -> {
+                    // Do nothing
+                    true
+                }
             }
         }
     }
 
     private fun handleHardwareKeyUp(
         keyCode: Int, event: KeyEvent?
-    ) = HardwareKey.match(keyCode)?.let { (hardwareKey, _) ->
-        val gestureAction = viewModel.getHardwareKeyAction(hardwareKey)
-
-        if (gestureAction.isTwoWayAction && !hardwareKey.isTwoWayKey) {
-            Log.wtf(
-                LOG_TAG,
-                "${gestureAction.name} requires two-way key but ${hardwareKey.name} is not"
-            )
-            return@let true
-        }
-
-        when (gestureAction) {
-            GestureAction.SHUTTER -> {
+    ): Boolean? {
+        when (keyCode) {
+            KeyEvent.KEYCODE_SPACE,
+            KeyEvent.KEYCODE_ENTER,
+            KeyEvent.KEYCODE_NUMPAD_ENTER,
+            KeyEvent.KEYCODE_DPAD_CENTER -> {
                 if (viewModel.cameraMode.value != CameraMode.QR
                     && viewModel.isShutterButtonEnabled.value
                 ) {
                     shutterButton.performClick()
                 }
-                true
+                return true
+            }
+        }
+
+        return HardwareKey.match(keyCode)?.let { (hardwareKey, _) ->
+            val gestureAction = viewModel.getHardwareKeyAction(hardwareKey)
+
+            if (gestureAction.isTwoWayAction && !hardwareKey.isTwoWayKey) {
+                Log.wtf(
+                    LOG_TAG,
+                    "${gestureAction.name} requires two-way key but ${hardwareKey.name} is not"
+                )
+                return@let true
             }
 
-            GestureAction.FOCUS -> {
-                true
-            }
-
-            GestureAction.MIC_MUTE -> {
-                true
-            }
-
-            GestureAction.ZOOM -> {
-                true
-            }
-
-            GestureAction.DEFAULT -> {
-                if (hardwareKey.supportsDefault) {
-                    super.onKeyDown(keyCode, event)
-                } else {
-                    Log.wtf(
-                        LOG_TAG,
-                        "Got GestureAction.DEFAULT for ${hardwareKey.name} which doesn't support it"
-                    )
+            when (gestureAction) {
+                GestureAction.SHUTTER -> {
+                    if (viewModel.cameraMode.value != CameraMode.QR
+                        && viewModel.isShutterButtonEnabled.value
+                    ) {
+                        shutterButton.performClick()
+                    }
                     true
                 }
-            }
 
-            GestureAction.NOTHING -> {
-                // Do nothing
-                true
+                GestureAction.FOCUS -> {
+                    true
+                }
+
+                GestureAction.MIC_MUTE -> {
+                    true
+                }
+
+                GestureAction.ZOOM -> {
+                    true
+                }
+
+                GestureAction.DEFAULT -> {
+                    if (hardwareKey.supportsDefault) {
+                        super.onKeyDown(keyCode, event)
+                    } else {
+                        Log.wtf(
+                            LOG_TAG,
+                            "Got GestureAction.DEFAULT for ${hardwareKey.name} which doesn't support it"
+                        )
+                        true
+                    }
+                }
+
+                GestureAction.NOTHING -> {
+                    // Do nothing
+                    true
+                }
             }
         }
     }
