@@ -211,6 +211,7 @@ open class CameraActivity : AppCompatActivity(R.layout.activity_camera) {
     private val btnBbTimer by lazy { findViewById<ImageButton>(R.id.btnBbTimer) }
     private val btnBbAspectRatio by lazy { findViewById<ImageButton>(R.id.btnBbAspectRatio) }
     private val btnBbHdr by lazy { findViewById<ImageButton>(R.id.btnBbHdr) }
+    private val btnBbGrid by lazy { findViewById<ImageButton>(R.id.btnBbGrid) }
     private val btnBbSettings by lazy { findViewById<ImageButton>(R.id.btnBbSettings) }
     private val llBbSubmenu by lazy { findViewById<LinearLayout>(R.id.llBbSubmenu) }
 
@@ -658,11 +659,8 @@ open class CameraActivity : AppCompatActivity(R.layout.activity_camera) {
         // Enable edge-to-edge
         enableEdgeToEdge()
 
-        // Hide the status bars
-        window.updateBarsVisibility(
-            WindowInsetsControllerCompat.BEHAVIOR_DEFAULT,
-            statusBars = false,
-        )
+        // Hide status bars for true fullscreen
+        hideSystemBars()
 
         // Force dark navigation bar
         WindowCompat.getInsetsController(window, window.decorView)
@@ -705,7 +703,7 @@ open class CameraActivity : AppCompatActivity(R.layout.activity_camera) {
 
             findViewById<LinearLayout>(R.id.bbTopBar).setPadding(
                 8.px,
-                insets.top + 4.px,
+                4.px,
                 8.px,
                 4.px
             )
@@ -976,6 +974,25 @@ open class CameraActivity : AppCompatActivity(R.layout.activity_camera) {
         viewFinder.controller = null
 
         super.onDestroy()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        hideSystemBars()
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) {
+            hideSystemBars()
+        }
+    }
+
+    private fun hideSystemBars() {
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        val controller = WindowCompat.getInsetsController(window, window.decorView)
+        controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        controller.hide(WindowInsetsCompat.Type.statusBars())
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?) = when (capturePreviewLayout.isVisible) {
@@ -1348,6 +1365,15 @@ open class CameraActivity : AppCompatActivity(R.layout.activity_camera) {
         launch {
             viewModel.gridMode.collectLatest { gridMode ->
                 gridView.mode = gridMode
+
+                btnBbGrid.setImageResource(
+                    when (gridMode) {
+                        GridMode.OFF -> R.drawable.ic_grid_3x3_off
+                        GridMode.ON_3 -> R.drawable.ic_grid_3x3
+                        GridMode.ON_4 -> R.drawable.ic_grid_4x4
+                        GridMode.ON_GOLDEN_RATIO -> R.drawable.ic_grid_goldenratio
+                    }
+                )
 
                 // Update secondary bar buttons
                 gridButton.setCompoundDrawablesWithIntrinsicBounds(
@@ -1970,6 +1996,15 @@ open class CameraActivity : AppCompatActivity(R.layout.activity_camera) {
             updateOverlaysVisibility()
         }
 
+        btnBbGrid.setOnClickListener {
+            if (llBbSubmenu.isVisible && llBbSubmenu.tag == "grid") {
+                llBbSubmenu.isVisible = false
+            } else {
+                showGridSubmenu()
+            }
+            updateOverlaysVisibility()
+        }
+
         btnBbSettings.setOnClickListener {
             openSettings()
         }
@@ -2389,6 +2424,113 @@ open class CameraActivity : AppCompatActivity(R.layout.activity_camera) {
             row.addView(btn)
         }
         llBbSubmenu.addView(row)
+    }
+
+    private fun showGridSubmenu() {
+        llBbSubmenu.removeAllViews()
+        llBbSubmenu.tag = "grid"
+        llBbSubmenu.isVisible = true
+        updateOverlaysVisibility()
+
+        // 1. Grid Options Row
+        val gridRow = LinearLayout(this).apply {
+            layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+            setPadding(10.px, 4.px, 10.px, 2.px)
+        }
+
+        val currentGrid = viewModel.gridMode.value
+        val gridOptions = listOf(
+            Triple(GridMode.OFF, R.drawable.ic_grid_3x3_off, "OFF"),
+            Triple(GridMode.ON_3, R.drawable.ic_grid_3x3, "3×3"),
+            Triple(GridMode.ON_4, R.drawable.ic_grid_4x4, "4×4"),
+            Triple(GridMode.ON_GOLDEN_RATIO, R.drawable.ic_grid_goldenratio, "Φ Golden")
+        )
+
+        for ((mode, iconRes, label) in gridOptions) {
+            val isSelected = currentGrid == mode
+            val btn = Button(this).apply {
+                layoutParams = LinearLayout.LayoutParams(0, 36.px, 1f).apply {
+                    setMargins(3.px, 0, 3.px, 0)
+                }
+                text = label
+                textSize = 9.5f
+                setTextColor(if (isSelected) Color.BLACK else Color.WHITE)
+                typeface = Typeface.DEFAULT_BOLD
+                setBackgroundResource(R.drawable.lens_selector_button_background)
+                backgroundTintList = ColorStateList.valueOf(
+                    if (isSelected) Color.WHITE else Color.parseColor("#33FFFFFF")
+                )
+                val iconDrawable = getScaledSubmenuDrawable(iconRes, isSelected)
+                setCompoundDrawables(iconDrawable, null, null, null)
+                compoundDrawablePadding = 3.px
+                gravity = Gravity.CENTER
+                setPadding(4.px, 2.px, 4.px, 2.px)
+                setOnClickListener {
+                    viewModel.setGridMode(mode)
+                    showGridSubmenu()
+                }
+            }
+            gridRow.addView(btn)
+        }
+        llBbSubmenu.addView(gridRow)
+
+        // 2. Leveler Section Header
+        val levelerHeader = TextView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                setMargins(0, 6.px, 0, 4.px)
+            }
+            text = getString(R.string.leveler_title).uppercase()
+            textSize = 10f
+            setTextColor(Color.parseColor("#BBBBBB"))
+            typeface = Typeface.DEFAULT_BOLD
+        }
+        llBbSubmenu.addView(levelerHeader)
+
+        // 3. Leveler Options Row
+        val levelerRow = LinearLayout(this).apply {
+            layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+            setPadding(10.px, 2.px, 10.px, 6.px)
+        }
+
+        val isLevelerOn = viewModel.levelerEnabled.value
+        val offLabel = getString(R.string.bb_zsl_disabled).replace("ZSL: ", "")
+        val onLabel = getString(R.string.bb_zsl_enabled).replace("ZSL: ", "")
+        val levelerOptions = listOf(
+            Pair("${getString(R.string.leveler_title)}: $offLabel", false),
+            Pair("${getString(R.string.leveler_title)}: $onLabel", true)
+        )
+
+        for ((label, enabled) in levelerOptions) {
+            val isSelected = isLevelerOn == enabled
+            val btn = Button(this).apply {
+                layoutParams = LinearLayout.LayoutParams(0, 32.px, 1f).apply {
+                    setMargins(3.px, 0, 3.px, 0)
+                }
+                text = label
+                textSize = 9.5f
+                setTextColor(if (isSelected) Color.BLACK else Color.WHITE)
+                typeface = Typeface.DEFAULT_BOLD
+                setBackgroundResource(R.drawable.lens_selector_button_background)
+                backgroundTintList = ColorStateList.valueOf(
+                    if (isSelected) Color.WHITE else Color.parseColor("#33FFFFFF")
+                )
+                val iconDrawable = getScaledSubmenuDrawable(R.drawable.ic_screen_rotation, isSelected)
+                setCompoundDrawables(iconDrawable, null, null, null)
+                compoundDrawablePadding = 3.px
+                gravity = Gravity.CENTER
+                setPadding(4.px, 2.px, 4.px, 2.px)
+                setOnClickListener {
+                    viewModel.setLevelerEnabled(enabled)
+                    showGridSubmenu()
+                }
+            }
+            levelerRow.addView(btn)
+        }
+        llBbSubmenu.addView(levelerRow)
     }
 
     private fun setupProControls() {

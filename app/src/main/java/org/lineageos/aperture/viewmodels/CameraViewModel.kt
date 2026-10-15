@@ -1377,6 +1377,14 @@ class CameraViewModel(application: Application) : ApertureViewModel(application)
         }
     }
 
+    fun setGridMode(gridMode: GridMode) {
+        preferencesRepository.lastGridMode.value = gridMode
+    }
+
+    fun setLevelerEnabled(enabled: Boolean) {
+        preferencesRepository.leveler.value = enabled
+    }
+
     /**
      * Toggle the timer mode.
      */

@@ -60,18 +60,30 @@
             android:layout_width="0dp"
             android:layout_height="48dp"
             android:layout_weight="1"
-            android:padding="12dp"
+            android:padding="10dp"
             android:background="?attr/selectableItemBackgroundBorderless"
             android:contentDescription="@string/effect_hdr"
             android:scaleType="centerInside"
             android:src="@drawable/ic_hdr_auto_white_24dp" />
 
         <ImageButton
+            android:id="@+id/btnBbGrid"
+            android:layout_width="0dp"
+            android:layout_height="48dp"
+            android:layout_weight="1"
+            android:padding="10dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/grid_off"
+            android:scaleType="centerInside"
+            app:tint="@android:color/white"
+            android:src="@drawable/ic_grid_3x3_off" />
+
+        <ImageButton
             android:id="@+id/btnBbSettings"
             android:layout_width="0dp"
             android:layout_height="48dp"
             android:layout_weight="1"
-            android:padding="12dp"
+            android:padding="10dp"
             android:background="?attr/selectableItemBackgroundBorderless"
             android:contentDescription="@string/settings"
             android:scaleType="centerInside"
