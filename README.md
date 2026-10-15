@@ -4,6 +4,29 @@ A customized, feature-rich camera app built on top of LineageOS Aperture and And
 
 Specifically optimized and tested for keyboard-centric devices such as the **Zinwa Q25** (square 720×720 display with physical trackball) and the **BlackBerry KEY2** (Android 16 / LineageOS 24).
 
+
+---
+
+## 📸 Screenshots
+
+### BlackBerry KEY2 (Portrait 3:2)
+
+<p align="center">
+  <img src="docs/screenshots/key2_viewfinder_modes.png" width="30%" alt="KEY2 Viewfinder & Mode Drawer" />
+  <img src="docs/screenshots/key2_resolution_zsl.png" width="30%" alt="KEY2 Resolutions & Latency / ZSL" />
+  <img src="docs/screenshots/key2_live_filters.png" width="30%" alt="KEY2 Live Filters Ribbon" />
+</p>
+
+### Zinwa Q25 (Square 1:1 / 720×720)
+
+<p align="center">
+  <img src="docs/screenshots/q25_viewfinder_grid.png" width="19%" alt="Q25 Viewfinder with Grid" />
+  <img src="docs/screenshots/q25_modes_drawer.png" width="19%" alt="Q25 Mode Drawer" />
+  <img src="docs/screenshots/q25_live_filters.png" width="19%" alt="Q25 Live Filters" />
+  <img src="docs/screenshots/q25_resolution_latency.png" width="19%" alt="Q25 50MP Resolutions & Latency" />
+  <img src="docs/screenshots/q25_grid_leveler.png" width="19%" alt="Q25 Grid & Leveler Menu" />
+</p>
+
 ---
 
 ## ✨ Features
