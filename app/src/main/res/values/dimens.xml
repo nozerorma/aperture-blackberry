@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+     SPDX-FileCopyrightText: The LineageOS Project
+     SPDX-License-Identifier: Apache-2.0
+-->
+<resources>
+    <dimen name="capture_button_width">58dp</dimen>
+    <dimen name="primary_capture_button_size">70dp</dimen>
+    <dimen name="capture_button_border_diameter">70dp</dimen>
+    <dimen name="capture_button_icon_width">32dp</dimen>
+    <dimen name="capture_button_icon_height">32dp</dimen>
+    <dimen name="top_bar_height">56dp</dimen>
+    <dimen name="bottom_bar_height">84dp</dimen>
+</resources>

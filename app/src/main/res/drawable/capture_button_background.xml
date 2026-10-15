@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list
+  xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:top="1.0dip" android:bottom="-1.0dip">
+        <shape>
+            <solid android:color="@color/capture_button_text_shadow_color" />
+            <corners android:radius="70.0dip" />
+        </shape>
+    </item>
+    <item>
+        <shape android:layout_width="wrap_content" android:layout_height="wrap_content" android:shape="oval">
+            <corners android:radius="@dimen/capture_button_width" />
+            <solid android:color="@color/image_capture_white" />
+        </shape>
+    </item>
+</layer-list>

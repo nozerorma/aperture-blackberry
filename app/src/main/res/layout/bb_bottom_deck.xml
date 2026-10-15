@@ -1,0 +1,147 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+     SPDX-FileCopyrightText: The LineageOS Project
+     SPDX-License-Identifier: Apache-2.0
+-->
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/bbBottomDeck"
+    android:layout_width="match_parent"
+    android:layout_height="@dimen/bottom_bar_height"
+    android:background="@drawable/bb_bottom_deck_gradient"
+    android:clipChildren="false"
+    android:clipToPadding="false"
+    android:paddingHorizontal="10dp">
+
+    <!-- 1. Gallery thumbnail (Left) -->
+    <androidx.cardview.widget.CardView
+        android:id="@+id/galleryButtonCardView"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:backgroundTint="#333333"
+        app:cardCornerRadius="20dp"
+        app:cardElevation="0dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toStartOf="@+id/flipCameraButton"
+        app:layout_constraintHorizontal_chainStyle="spread"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent">
+
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent">
+
+            <ImageView
+                android:id="@+id/galleryButtonIconImageView"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:contentDescription="@string/gallery_button_description"
+                android:scaleX="0.50"
+                android:scaleY="0.50"
+                app:tint="?attr/colorOnSecondaryContainer" />
+
+            <ImageView
+                android:id="@+id/galleryButtonPreviewImageView"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:contentDescription="@string/gallery_button_description"
+                android:scaleType="centerCrop"
+                android:visibility="gone" />
+
+        </FrameLayout>
+
+    </androidx.cardview.widget.CardView>
+
+    <!-- 2. Flip Camera (Second from left) -->
+    <ImageButton
+        android:id="@+id/flipCameraButton"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:contentDescription="@string/flip_camera_button_description"
+        android:padding="8dp"
+        android:scaleType="centerInside"
+        android:src="@drawable/ic_camera_rear_bb_white_24dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toStartOf="@+id/bbShutterContainer"
+        app:layout_constraintStart_toEndOf="@+id/galleryButtonCardView"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <!-- 3. Primary Shutter Button (Center) -->
+    <FrameLayout
+        android:id="@+id/bbShutterContainer"
+        android:layout_width="64dp"
+        android:layout_height="64dp"
+        android:clipChildren="false"
+        android:clipToPadding="false"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toStartOf="@+id/bbModeButton"
+        app:layout_constraintStart_toEndOf="@+id/flipCameraButton"
+        app:layout_constraintTop_toTopOf="parent">
+
+        <!-- Outer Border for Timer / Animation -->
+        <View
+            android:id="@+id/bbShutterBorder"
+            android:layout_width="64dp"
+            android:layout_height="64dp"
+            android:layout_gravity="center"
+            android:background="@drawable/capture_button_border"
+            android:visibility="invisible" />
+
+        <!-- Main Button Circle -->
+        <ImageButton
+            android:id="@+id/shutterButton"
+            android:layout_width="64dp"
+            android:layout_height="64dp"
+            android:layout_gravity="center"
+            android:background="@null"
+            android:contentDescription="@string/shutter_button_description"
+            android:scaleType="centerInside"
+            android:soundEffectsEnabled="false"
+            android:src="@drawable/avd_photo_capture" />
+
+        <!-- Video recording state indicator (inside/over shutter) -->
+        <ImageButton
+            android:id="@+id/videoRecordingStateButton"
+            android:layout_width="28dp"
+            android:layout_height="28dp"
+            android:layout_gravity="center"
+            android:background="@null"
+            android:contentDescription="@string/video_recording_state_button_description"
+            android:src="@drawable/avd_video_recording_pause"
+            android:visibility="gone" />
+
+    </FrameLayout>
+
+    <!-- 4. Mode menu button (Fourth from left) -->
+    <ImageButton
+        android:id="@+id/bbModeButton"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:background="@drawable/bb_mode_icon_bg"
+        android:contentDescription="Mode Selector"
+        android:padding="8dp"
+        android:scaleType="centerInside"
+        android:src="@drawable/ic_mode_photo"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toStartOf="@+id/bbFilterButton"
+        app:layout_constraintStart_toEndOf="@+id/bbShutterContainer"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <!-- 5. Magic Wand / Live Filters (Right) -->
+    <ImageButton
+        android:id="@+id/bbFilterButton"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:contentDescription="Live Filters"
+        android:padding="8dp"
+        android:scaleType="centerInside"
+        android:src="@drawable/ic_filter_off_color_24dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toEndOf="@+id/bbModeButton"
+        app:layout_constraintTop_toTopOf="parent" />
+
+</androidx.constraintlayout.widget.ConstraintLayout>

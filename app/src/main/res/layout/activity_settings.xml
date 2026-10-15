@@ -16,16 +16,17 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:fitsSystemWindows="true"
+        app:liftOnScroll="true"
         app:liftOnScrollTargetViewId="@+id/settings">
 
         <com.google.android.material.appbar.CollapsingToolbarLayout
             style="?attr/collapsingToolbarLayoutLargeStyle"
             android:layout_width="match_parent"
-            android:layout_height="179dp"
-            app:expandedTitleMarginBottom="31dp"
-            app:expandedTitleMarginStart="24dp"
-            app:expandedTitleTextAppearance="?attr/textAppearanceDisplaySmall"
-            app:layout_scrollFlags="scroll|exitUntilCollapsed|snap"
+            android:layout_height="?actionBarSize"
+            app:expandedTitleMarginBottom="0dp"
+            app:expandedTitleMarginStart="16dp"
+            app:expandedTitleTextAppearance="?attr/textAppearanceTitleLarge"
+            app:titleEnabled="false"
             app:titleCollapseMode="fade"
             app:toolbarId="@id/toolbar">
 
@@ -34,6 +35,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="?actionBarSize"
                 android:elevation="0dp"
+                app:titleTextAppearance="?attr/textAppearanceTitleLarge"
                 app:layout_collapseMode="pin" />
 
         </com.google.android.material.appbar.CollapsingToolbarLayout>

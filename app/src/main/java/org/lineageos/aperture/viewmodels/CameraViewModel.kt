@@ -1401,6 +1401,40 @@ class CameraViewModel(application: Application) : ApertureViewModel(application)
         }
 
     /**
+     * Directly set the extension mode.
+     */
+    fun setExtensionMode(extensionMode: Int) =
+        updateConfiguration<CameraConfiguration.Photo> { cameraConfiguration ->
+            val targetMode = if (cameraConfiguration.camera.supportedExtensionModes.contains(extensionMode)) {
+                extensionMode
+            } else {
+                ExtensionMode.NONE
+            }
+            preferencesRepository.photoEffect.value = targetMode
+            cameraConfiguration.copy(
+                extensionMode = targetMode,
+            )
+        }
+
+    /**
+     * Directly set the flash mode.
+     */
+    fun setFlashMode(flashMode: FlashMode) {
+        when (cameraMode.value) {
+            CameraMode.PHOTO -> preferencesRepository.photoFlashMode.value = flashMode
+            CameraMode.VIDEO -> preferencesRepository.videoFlashMode.value = flashMode
+            CameraMode.QR -> qrFlashMode.value = flashMode
+        }
+    }
+
+    /**
+     * Directly set the timer mode.
+     */
+    fun setTimerMode(timerMode: TimerMode) {
+        preferencesRepository.timerMode.value = timerMode
+    }
+
+    /**
      * Cycle the photo aspect ratio.
      */
     fun cyclePhotoAspectRatio() =
@@ -1417,6 +1451,38 @@ class CameraViewModel(application: Application) : ApertureViewModel(application)
                 photoAspectRatio = newAspectRatio,
             )
         }
+
+    /**
+     * Directly set the photo aspect ratio.
+     */
+    fun setPhotoAspectRatio(aspectRatio: Int) =
+        updateConfiguration<CameraConfiguration.Photo> { cameraConfiguration ->
+            preferencesRepository.photoAspectRatio.value = aspectRatio
+
+            cameraConfiguration.copy(
+                photoAspectRatio = aspectRatio,
+            )
+        }
+
+    /**
+     * Force a rebind of the camera configuration.
+     */
+    fun rebindCamera() =
+        updateConfiguration<CameraConfiguration> { cameraConfiguration ->
+            createInitialCameraConfiguration(
+                camera = cameraConfiguration.camera,
+                cameraMode = cameraConfiguration.cameraMode,
+            )
+        }
+
+    fun setCaptureModePreference(mode: Int, zsl: Boolean) {
+        preferencesRepository.photoCaptureMode.value = mode
+        preferencesRepository.enableZsl.value = zsl
+    }
+
+    fun getPhotoCaptureModePreference(): Int = preferencesRepository.photoCaptureMode.value
+
+    fun getEnableZslPreference(): Boolean = preferencesRepository.enableZsl.value
 
     /**
      * Cycle the video quality.

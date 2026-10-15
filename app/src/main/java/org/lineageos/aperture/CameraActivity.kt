@@ -10,11 +10,16 @@ import android.app.KeyguardManager
 import android.content.ClipData
 import android.content.Intent
 import android.content.pm.ActivityInfo
+import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.Paint
 import android.graphics.Rect
 import android.graphics.drawable.AnimatedVectorDrawable
 import android.graphics.drawable.ColorDrawable
+import android.hardware.camera2.CameraMetadata
+import android.hardware.camera2.CaptureRequest
 import android.icu.text.DecimalFormat
 import android.net.Uri
 import android.os.Build
@@ -27,13 +32,25 @@ import android.util.Log
 import android.view.GestureDetector
 import android.view.KeyEvent
 import android.view.MotionEvent
+import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
 import android.widget.Button
+import android.widget.FrameLayout
 import android.widget.HorizontalScrollView
 import android.widget.ImageButton
 import android.widget.ImageView
+import android.widget.LinearLayout
+import android.widget.TextView
 import android.widget.Toast
+import android.content.res.ColorStateList
+import android.graphics.ColorMatrix
+import android.graphics.ColorMatrixColorFilter
+import android.graphics.RenderEffect
+import android.graphics.Typeface
+import android.util.Size
+import android.view.Gravity
+import com.google.android.material.card.MaterialCardView
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
@@ -45,6 +62,7 @@ import androidx.camera.core.ImageCapture
 import androidx.camera.core.MirrorMode
 import androidx.camera.core.resolutionselector.AspectRatioStrategy
 import androidx.camera.core.resolutionselector.ResolutionSelector
+import androidx.camera.core.resolutionselector.ResolutionStrategy
 import androidx.camera.extensions.ExtensionMode
 import androidx.camera.video.Quality
 import androidx.camera.video.QualitySelector
@@ -183,7 +201,201 @@ open class CameraActivity : AppCompatActivity(R.layout.activity_camera) {
     private val videoDynamicRangeButton by lazy { findViewById<Button>(R.id.videoDynamicRangeButton) }
     private val viewFinder by lazy { findViewById<PreviewView>(R.id.viewFinder) }
     private val viewFinderFocus by lazy { findViewById<ImageView>(R.id.viewFinderFocus) }
-    private val zoomLevel by lazy { findViewById<HorizontalSlider>(R.id.zoomLevel) }
+    private val zoomLevel by lazy { findViewById<VerticalSlider>(R.id.zoomLevel) }
+
+    // BlackBerry UI Views
+    private val bbTopBarContainer by lazy { findViewById<LinearLayout>(R.id.bbTopBarLayout) }
+    private val btnBbFlash by lazy { findViewById<ImageButton>(R.id.btnBbFlash) }
+    private val btnBbTimer by lazy { findViewById<ImageButton>(R.id.btnBbTimer) }
+    private val btnBbAspectRatio by lazy { findViewById<ImageButton>(R.id.btnBbAspectRatio) }
+    private val btnBbHdr by lazy { findViewById<ImageButton>(R.id.btnBbHdr) }
+    private val btnBbSettings by lazy { findViewById<ImageButton>(R.id.btnBbSettings) }
+    private val llBbSubmenu by lazy { findViewById<LinearLayout>(R.id.llBbSubmenu) }
+
+    private val bbModeButton by lazy { findViewById<ImageButton>(R.id.bbModeButton) }
+    private val bbModeGridContainer by lazy { findViewById<LinearLayout>(R.id.bbModeGridLayout) }
+    private val modeItemPhoto by lazy { findViewById<LinearLayout>(R.id.modeItemPhoto) }
+    private val modeItemVideo by lazy { findViewById<LinearLayout>(R.id.modeItemVideo) }
+    private val modeItemPro by lazy { findViewById<LinearLayout>(R.id.modeItemPro) }
+    private val modeItemPortrait by lazy { findViewById<LinearLayout>(R.id.modeItemPortrait) }
+    private val modeItemPanorama by lazy { findViewById<LinearLayout>(R.id.modeItemPanorama) }
+    private val modeItemScanner by lazy { findViewById<LinearLayout>(R.id.modeItemScanner) }
+    private val ivModeIconPhoto by lazy { findViewById<ImageView>(R.id.ivModeIconPhoto) }
+    private val ivModeIconVideo by lazy { findViewById<ImageView>(R.id.ivModeIconVideo) }
+    private val ivModeIconPro by lazy { findViewById<ImageView>(R.id.ivModeIconPro) }
+    private val ivModeIconPortrait by lazy { findViewById<ImageView>(R.id.ivModeIconPortrait) }
+    private val ivModeIconPanorama by lazy { findViewById<ImageView>(R.id.ivModeIconPanorama) }
+    private val ivModeIconScanner by lazy { findViewById<ImageView>(R.id.ivModeIconScanner) }
+
+    private val bbFilterButton by lazy { findViewById<ImageButton>(R.id.bbFilterButton) }
+    private val bbFilterRibbonContainer by lazy { findViewById<HorizontalScrollView>(R.id.bbFilterRibbonLayout) }
+    private val bbFilterItemList by lazy { findViewById<LinearLayout>(R.id.bbFilterItemList) }
+    private val bbBottomDeck by lazy { findViewById<ConstraintLayout>(R.id.bbBottomDeckLayout) }
+
+    private val bbProControlsContainer by lazy { findViewById<LinearLayout>(R.id.bbProControlsLayout) }
+    private val bbEvDial by lazy { findViewById<LinearLayout>(R.id.bbEvDial) }
+    private val tvEvIndicator by lazy { findViewById<TextView>(R.id.tvEvIndicator) }
+    private val btnProEv by lazy { findViewById<Button>(R.id.btnProEv) }
+    private val btnProIso by lazy { findViewById<Button>(R.id.btnProIso) }
+    private val btnProShutter by lazy { findViewById<Button>(R.id.btnProShutter) }
+    private val btnProWb by lazy { findViewById<Button>(R.id.btnProWb) }
+    private val btnProMf by lazy { findViewById<Button>(R.id.btnProMf) }
+    private val btnProAuto by lazy { findViewById<Button>(R.id.btnProAuto) }
+    private val bbProSubmenuScroll by lazy { findViewById<HorizontalScrollView>(R.id.bbProSubmenuScroll) }
+    private val bbProSubmenuList by lazy { findViewById<LinearLayout>(R.id.bbProSubmenuList) }
+
+    private val scannerReticleLayout by lazy { findViewById<FrameLayout>(R.id.scannerReticleLayout) }
+    private val panoramaGuideLayout by lazy { findViewById<LinearLayout>(R.id.panoramaGuideLayout) }
+    private val portraitGuideLayout by lazy { findViewById<LinearLayout>(R.id.portraitGuideLayout) }
+
+    private var isSquareMode: Boolean = false
+    private var isHdrEnabled: Boolean = false
+    private var isPortraitMode: Boolean = false
+    private var isPanoramaMode: Boolean = false
+    private var is3_2Mode: Boolean = false
+    private var currentSelectedRatio: Int = AspectRatio.RATIO_4_3
+
+    data class ResolutionOption(
+        val label: String,
+        val size: Size,
+        val mp: String
+    )
+
+    private val resolutions4_3 = listOf(
+        ResolutionOption("50 MP", Size(8160, 6144), "8160×6144"),
+        ResolutionOption("12 MP", Size(4032, 3024), "4032×3024"),
+        ResolutionOption("8 MP", Size(3264, 2448), "3264×2448"),
+        ResolutionOption("5 MP", Size(2560, 1920), "2560×1920"),
+    )
+
+    private val resolutions16_9 = listOf(
+        ResolutionOption("9.4 MP", Size(4096, 2304), "4096×2304"),
+        ResolutionOption("8.3 MP (4K)", Size(3840, 2160), "3840×2160"),
+        ResolutionOption("2.1 MP (1080p)", Size(1920, 1080), "1920×1080"),
+    )
+
+    private val resolutions1_1 = listOf(
+        ResolutionOption("37 MP", Size(6144, 6144), "6144×6144"),
+        ResolutionOption("9.1 MP", Size(3024, 3024), "3024×3024"),
+        ResolutionOption("6 MP", Size(2448, 2448), "2448×2448"),
+        ResolutionOption("0.5 MP", Size(720, 720), "720×720"),
+    )
+
+    private val resolutions3_2 = listOf(
+        ResolutionOption("11 MP", Size(4032, 2688), "4032×2688"),
+        ResolutionOption("7 MP", Size(3264, 2176), "3264×2176"),
+    )
+
+    private var currentTargetResolution: Size? = null
+    private var currentResolutionLabel: String = "12 MP"
+
+    private var currentIso: Int? = null
+    private var currentExposureNanos: Long? = null
+    private var currentAwbMode: Int? = null
+    private var currentFocusDistance: Float? = null
+
+    enum class BbFilter(
+        val titleRes: Int,
+        val colorMatrix: ColorMatrix?,
+        val drawableRes: Int,
+    ) {
+        NONE(R.string.bb_filter_none, null, R.drawable.lighthouse2_normal),
+        SATURATE(R.string.bb_filter_saturate, ColorMatrix().apply { setSaturation(1.6f) }, R.drawable.lighthouse2_saturate),
+        FRESHEN(R.string.bb_filter_freshen, ColorMatrix(floatArrayOf(
+            1.15f, 0f, 0f, 0f, 15f,
+            0f, 1.05f, 0f, 0f, 5f,
+            0f, 0f, 0.85f, 0f, -20f,
+            0f, 0f, 0f, 1f, 0f
+        )), R.drawable.lighthouse2_freshen),
+        FREEZE(R.string.bb_filter_freeze, ColorMatrix(floatArrayOf(
+            0.85f, 0f, 0f, 0f, -10f,
+            0f, 1.05f, 0f, 0f, 5f,
+            0f, 0f, 1.30f, 0f, 25f,
+            0f, 0f, 0f, 1f, 0f
+        )), R.drawable.lighthouse2_freeze),
+        SEPIA(R.string.bb_filter_sepia, ColorMatrix(floatArrayOf(
+            0.393f, 0.769f, 0.189f, 0f, 0f,
+            0.349f, 0.686f, 0.168f, 0f, 0f,
+            0.272f, 0.534f, 0.131f, 0f, 0f,
+            0f, 0f, 0f, 1f, 0f
+        )), R.drawable.lighthouse2_sepia),
+        STARK(R.string.bb_filter_stark, ColorMatrix(floatArrayOf(
+            1.5f * 0.299f, 1.5f * 0.587f, 1.5f * 0.114f, 0f, -40f,
+            1.5f * 0.299f, 1.5f * 0.587f, 1.5f * 0.114f, 0f, -40f,
+            1.5f * 0.299f, 1.5f * 0.587f, 1.5f * 0.114f, 0f, -40f,
+            0f, 0f, 0f, 1f, 0f
+        )), R.drawable.lighthouse2_stark),
+        AGAPANTHA(R.string.bb_filter_agapantha, ColorMatrix(floatArrayOf(
+            1.1f, 0f, 0.2f, 0f, 10f,
+            0f, 0.9f, 0.1f, 0f, -10f,
+            0.2f, 0f, 1.3f, 0f, 25f,
+            0f, 0f, 0f, 1f, 0f
+        )), R.drawable.lighthouse2_agapantha),
+        CLIFTON(R.string.bb_filter_clifton, ColorMatrix(floatArrayOf(
+            0.9f, 0f, 0f, 0f, 20f,
+            0f, 1.05f, 0f, 0f, 15f,
+            0f, 0f, 1.15f, 0f, 30f,
+            0f, 0f, 0f, 1f, 0f
+        )), R.drawable.lighthouse2_clifton),
+        BW093(R.string.bb_filter_bw093, ColorMatrix(floatArrayOf(
+            0.33f, 0.33f, 0.33f, 0f, 30f,
+            0.33f, 0.33f, 0.33f, 0f, 30f,
+            0.33f, 0.33f, 0.33f, 0f, 30f,
+            0f, 0f, 0f, 1f, 0f
+        )), R.drawable.lighthouse2_bw093),
+        ILFORD(R.string.bb_filter_ilford, ColorMatrix().apply { setSaturation(0f) }, R.drawable.lighthouse2_ilford),
+        PORTRA160(R.string.bb_filter_portra160, ColorMatrix(floatArrayOf(
+            1.2f, 0f, 0f, 0f, 10f,
+            0f, 1.1f, 0f, 0f, 5f,
+            0f, 0f, 0.95f, 0f, -10f,
+            0f, 0f, 0f, 1f, 0f
+        )), R.drawable.lighthouse2_portra160),
+        ROUGE(R.string.bb_filter_rouge, ColorMatrix(floatArrayOf(
+            1.35f, 0f, 0f, 0f, 20f,
+            0f, 0.95f, 0f, 0f, -5f,
+            0f, 0f, 0.95f, 0f, -5f,
+            0f, 0f, 0f, 1f, 0f
+        )), R.drawable.lighthouse2_rouge),
+        VIGNETTE(R.string.bb_filter_vignette, ColorMatrix(floatArrayOf(
+            0.9f, 0f, 0f, 0f, -15f,
+            0f, 0.9f, 0f, 0f, -15f,
+            0f, 0f, 0.9f, 0f, -15f,
+            0f, 0f, 0f, 1f, 0f
+        )), R.drawable.lighthouse2_vignette),
+        PX70(R.string.bb_filter_px70, ColorMatrix(floatArrayOf(
+            1.05f, 0f, 0.1f, 0f, 15f,
+            0f, 1.1f, 0f, 0f, 10f,
+            0.1f, 0f, 0.85f, 0f, -10f,
+            0f, 0f, 0f, 1f, 0f
+        )), R.drawable.lighthouse2_px70),
+        NEGATIVE(R.string.bb_filter_negative, ColorMatrix(floatArrayOf(
+            -1f, 0f, 0f, 0f, 255f,
+            0f, -1f, 0f, 0f, 255f,
+            0f, 0f, -1f, 0f, 255f,
+            0f, 0f, 0f, 1f, 0f
+        )), R.drawable.lighthouse2_negative),
+        DESATURATE(R.string.bb_filter_desaturate, ColorMatrix().apply { setSaturation(0.35f) }, R.drawable.lighthouse2_desaturate),
+        GILD(R.string.bb_filter_gild, ColorMatrix(floatArrayOf(
+            1.25f, 0f, 0f, 0f, 25f,
+            0f, 1.15f, 0f, 0f, 15f,
+            0f, 0f, 0.8f, 0f, -30f,
+            0f, 0f, 0f, 1f, 0f
+        )), R.drawable.lighthouse2_gild),
+        INFRARED(R.string.bb_filter_infrared, ColorMatrix(floatArrayOf(
+            0.2f, 0.7f, 0.1f, 0f, 20f,
+            0.9f, 0.1f, 0f, 0f, -20f,
+            0.9f, 0.1f, 0f, 0f, 40f,
+            0f, 0f, 0f, 1f, 0f
+        )), R.drawable.lighthouse2_infrared),
+        PROTEA(R.string.bb_filter_protea, ColorMatrix(floatArrayOf(
+            1.25f, 0f, 0.15f, 0f, 15f,
+            0f, 0.95f, 0.05f, 0f, 0f,
+            0.15f, 0f, 1.15f, 0f, 10f,
+            0f, 0f, 0f, 1f, 0f
+        )), R.drawable.lighthouse2_protea)
+    }
+
+    private var currentBbFilter: BbFilter = BbFilter.NONE
 
     // System services
     private val keyguardManager by lazy { getSystemService(KeyguardManager::class.java) }
@@ -208,6 +420,28 @@ open class CameraActivity : AppCompatActivity(R.layout.activity_camera) {
         GestureDetector(this, object : GestureDetector.SimpleOnGestureListener() {
             override fun onSingleTapUp(e: MotionEvent): Boolean {
                 viewFinderTouchEvent = e
+                return false
+            }
+
+            override fun onScroll(
+                e1: MotionEvent?, e2: MotionEvent, distanceX: Float, distanceY: Float
+            ): Boolean {
+                if (zoomGestureDetectorIsInProgress) {
+                    return false
+                }
+                // Vertical scroll to zoom: drag UP zooms in, drag DOWN zooms out
+                if (abs(distanceY) > abs(distanceX) * 1.1f && abs(distanceY) > 2f) {
+                    val currentLinear = viewModel.zoomState.value?.linearZoom ?: 0f
+                    val viewFinderH = viewFinder.height.toFloat().coerceAtLeast(300f)
+                    val delta = distanceY / (viewFinderH * 0.7f)
+                    val newLinear = (currentLinear + delta).coerceIn(0f, 1f)
+                    viewModel.cameraController.setLinearZoom(newLinear)
+                    zoomLevel.progress = newLinear
+                    zoomLevel.isVisible = true
+                    handler.removeMessages(MSG_HIDE_ZOOM_SLIDER)
+                    handler.sendMessageDelayed(handler.obtainMessage(MSG_HIDE_ZOOM_SLIDER), 2500)
+                    return true
+                }
                 return false
             }
 
@@ -240,6 +474,9 @@ open class CameraActivity : AppCompatActivity(R.layout.activity_camera) {
 
                 is ZoomGestureDetector.ZoomEvent.Move -> {
                     viewModel.cameraController.onPinchToZoom(it.incrementalScaleFactor)
+                    zoomLevel.isVisible = true
+                    handler.removeMessages(MSG_HIDE_ZOOM_SLIDER)
+                    handler.sendMessageDelayed(handler.obtainMessage(MSG_HIDE_ZOOM_SLIDER), 2500)
                     handler.removeMessages(MSG_ON_PINCH_TO_ZOOM)
                     handler.sendMessageDelayed(handler.obtainMessage(MSG_ON_PINCH_TO_ZOOM), 500)
                 }
@@ -414,6 +651,19 @@ open class CameraActivity : AppCompatActivity(R.layout.activity_camera) {
         ViewCompat.setOnApplyWindowInsetsListener(mainLayout) { _, windowInsets ->
             val insets = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars())
 
+            findViewById<LinearLayout>(R.id.bbTopBar).setPadding(
+                8.px,
+                insets.top + 4.px,
+                8.px,
+                4.px
+            )
+
+            bbBottomDeck.updateLayoutParams<ViewGroup.MarginLayoutParams> {
+                bottomMargin = insets.bottom
+                leftMargin = insets.left
+                rightMargin = insets.right
+            }
+
             cameraModeSelectorLayout.updateLayoutParams<ViewGroup.MarginLayoutParams> {
                 bottomMargin = insets.bottom
                 leftMargin = insets.left
@@ -493,19 +743,28 @@ open class CameraActivity : AppCompatActivity(R.layout.activity_camera) {
             }
         }
 
+        zoomLevel.topLabel = "T"
+        zoomLevel.bottomLabel = "W"
+        zoomLevel.showTickers = true
         zoomLevel.onProgressChangedByUser = {
             viewModel.cameraController.setLinearZoom(it)
+            handler.removeMessages(MSG_HIDE_ZOOM_SLIDER)
+            handler.sendMessageDelayed(handler.obtainMessage(MSG_HIDE_ZOOM_SLIDER), 2500)
         }
         zoomLevel.textFormatter = {
-            "%.1fx".format(viewModel.zoomState.value?.zoomRatio)
+            val ratio = viewModel.zoomState.value?.zoomRatio ?: 1f
+            "%.1f×".format(ratio)
         }
 
         // Set expose level callback & text formatter
+        exposureLevel.topLabel = "+"
+        exposureLevel.bottomLabel = "−"
+        exposureLevel.showTickers = true
         exposureLevel.onProgressChangedByUser = {
             viewModel.setExposureCompensationLevel(it)
 
             handler.removeMessages(MSG_HIDE_EXPOSURE_SLIDER)
-            handler.sendMessageDelayed(handler.obtainMessage(MSG_HIDE_EXPOSURE_SLIDER), 2000)
+            handler.sendMessageDelayed(handler.obtainMessage(MSG_HIDE_EXPOSURE_SLIDER), 3000)
         }
 
         // Set primary bar button callbacks
@@ -550,9 +809,22 @@ open class CameraActivity : AppCompatActivity(R.layout.activity_camera) {
         }
         lensSelectorLayout.onZoomRatioChangeCallback = {
             viewModel.smoothZoom(it)
+            zoomLevel.isVisible = true
+            handler.removeMessages(MSG_HIDE_ZOOM_SLIDER)
+            handler.sendMessageDelayed(handler.obtainMessage(MSG_HIDE_ZOOM_SLIDER), 2500)
         }
         lensSelectorLayout.onResetZoomRatioCallback = {
             viewModel.resetZoom()
+            zoomLevel.isVisible = true
+            handler.removeMessages(MSG_HIDE_ZOOM_SLIDER)
+            handler.sendMessageDelayed(handler.obtainMessage(MSG_HIDE_ZOOM_SLIDER), 2500)
+        }
+        lensSelectorLayout.setOnClickListener {
+            zoomLevel.isVisible = !zoomLevel.isVisible
+            if (zoomLevel.isVisible) {
+                handler.removeMessages(MSG_HIDE_ZOOM_SLIDER)
+                handler.sendMessageDelayed(handler.obtainMessage(MSG_HIDE_ZOOM_SLIDER), 2500)
+            }
         }
 
         // Set capture preview callback
@@ -581,6 +853,9 @@ open class CameraActivity : AppCompatActivity(R.layout.activity_camera) {
         qrBottomSheetDialog.setOnDismissListener {
             viewModel.onQrDialogDismissed()
         }
+
+        // Initialize BlackBerry Camera UI
+        setupBbUi()
 
         lifecycleScope.launch {
             lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
@@ -668,8 +943,11 @@ open class CameraActivity : AppCompatActivity(R.layout.activity_camera) {
                         forceTorchSnackbar.show()
                     }
 
-                    is Event.FlipCameraAnimation ->
-                        (flipCameraButton.drawable as AnimatedVectorDrawable).start()
+                    is Event.FlipCameraAnimation -> {
+                        (flipCameraButton.drawable as? AnimatedVectorDrawable)?.start() ?: run {
+                            flipCameraButton.animate().rotationBy(180f).setDuration(300).start()
+                        }
+                    }
 
                     is Event.PhotoCaptureStatus -> when (event) {
                         is Event.PhotoCaptureStatus.CaptureStarted -> {
@@ -682,10 +960,14 @@ open class CameraActivity : AppCompatActivity(R.layout.activity_camera) {
                         }
 
                         is Event.PhotoCaptureStatus.ImageSaved -> {
+                            val savedUri = event.output.savedUri
+                            if (savedUri != null && (currentBbFilter != BbFilter.NONE || isSquareMode || is3_2Mode || currentTargetResolution != null)) {
+                                processSavedPhoto(savedUri)
+                            }
                             if (!viewModel.inSingleCaptureMode.value) {
-                                onCapturedMedia(event.output.savedUri)
+                                onCapturedMedia(savedUri)
                             } else {
-                                event.output.savedUri?.let {
+                                savedUri?.let {
                                     openCapturePreview(it, MediaType.PHOTO)
                                 }
                                 event.photoOutputStream?.use {
@@ -728,11 +1010,25 @@ open class CameraActivity : AppCompatActivity(R.layout.activity_camera) {
                 proButton.isVisible = cameraMode != CameraMode.QR
                 googleLensButton.isVisible = cameraMode == CameraMode.QR && isGoogleLensAvailable
 
-                // Update primary bar buttons
-                shutterButton.isInvisible = cameraMode == CameraMode.QR
+                // Update primary bar buttons (keep shutter visible in all modes including QR scanner)
+                shutterButton.isInvisible = false
 
                 // Update camera mode selector
                 cameraModeSelectorLayout.setCurrentCameraMode(cameraMode)
+
+                // Update BlackBerry UI
+                updateModeGridHighlight()
+                btnBbAspectRatio.isVisible = true
+                btnBbHdr.isVisible = cameraMode == CameraMode.PHOTO && !isPortraitMode && !isPanoramaMode
+            }
+        }
+
+        launch {
+            viewModel.cameraFacing.collectLatest { cameraFacing ->
+                flipCameraButton.setImageResource(
+                    if (cameraFacing == CameraFacing.FRONT) R.drawable.ic_camera_front_bb_white_24dp
+                    else R.drawable.ic_camera_rear_bb_white_24dp
+                )
             }
         }
 
@@ -768,6 +1064,7 @@ open class CameraActivity : AppCompatActivity(R.layout.activity_camera) {
                         it,
                         availableCameras,
                     )
+                    updateOverlaysVisibility()
                 }
             }
         }
@@ -874,6 +1171,7 @@ open class CameraActivity : AppCompatActivity(R.layout.activity_camera) {
                 settingsButton.isEnabled = cameraState == CameraState.IDLE
 
                 lensSelectorLayout.setCameraState(cameraState)
+                updateOverlaysVisibility()
 
                 // Update primary bar buttons
                 galleryButtonCardView.isEnabled = cameraState == CameraState.IDLE
@@ -968,6 +1266,15 @@ open class CameraActivity : AppCompatActivity(R.layout.activity_camera) {
                         FlashMode.SCREEN -> R.drawable.ic_flash_screen
                     }
                 )
+
+                // Update BlackBerry Top Bar Flash button
+                btnBbFlash.setImageResource(
+                    when (flashMode) {
+                        FlashMode.OFF -> R.drawable.ic_flash_off_white_24dp
+                        FlashMode.AUTO -> R.drawable.ic_flash_auto_white_24dp
+                        FlashMode.ON, FlashMode.TORCH, FlashMode.SCREEN -> R.drawable.ic_flash_on_white_24dp
+                    }
+                )
             }
         }
 
@@ -1022,6 +1329,15 @@ open class CameraActivity : AppCompatActivity(R.layout.activity_camera) {
                         TimerMode.OFF -> R.string.timer_off
                         TimerMode.ON_3S -> R.string.timer_3
                         TimerMode.ON_10S -> R.string.timer_10
+                    }
+                )
+
+                // Update BlackBerry Top Bar Timer button
+                btnBbTimer.setImageResource(
+                    when (timerMode) {
+                        TimerMode.OFF -> R.drawable.ic_timer_off_white_24dp
+                        TimerMode.ON_3S -> R.drawable.ic_timer_3_white_24dp
+                        TimerMode.ON_10S -> R.drawable.ic_timer_10_white_24dp
                     }
                 )
             }
@@ -1092,11 +1408,10 @@ open class CameraActivity : AppCompatActivity(R.layout.activity_camera) {
             viewModel.zoomState.collectLatest { zoomState ->
                 zoomState?.takeIf { it.minZoomRatio != it.maxZoomRatio }?.let {
                     zoomLevel.progress = it.linearZoom
-                    zoomLevel.isVisible = true
-
-                    handler.removeMessages(MSG_HIDE_ZOOM_SLIDER)
-                    handler.sendMessageDelayed(handler.obtainMessage(MSG_HIDE_ZOOM_SLIDER), 2000)
-
+                    if (zoomLevel.isVisible) {
+                        handler.removeMessages(MSG_HIDE_ZOOM_SLIDER)
+                        handler.sendMessageDelayed(handler.obtainMessage(MSG_HIDE_ZOOM_SLIDER), 2500)
+                    }
                     lensSelectorLayout.onZoomRatioChanged(it.zoomRatio)
                 }
             }
@@ -1163,6 +1478,16 @@ open class CameraActivity : AppCompatActivity(R.layout.activity_camera) {
                         else -> throw Exception("Unknown aspect ratio $photoAspectRatio")
                     }
                 )
+
+                // Update BlackBerry Top Bar Aspect Ratio button
+                btnBbAspectRatio.setImageResource(
+                    when {
+                        isSquareMode -> R.drawable.ic_ratio_square_white_24dp
+                        is3_2Mode -> R.drawable.ic_ratio_3_2_white_24dp
+                        photoAspectRatio == AspectRatio.RATIO_16_9 -> R.drawable.ic_ratio_16_9_white_24dp
+                        else -> R.drawable.ic_ratio_4_3_white_24dp
+                    }
+                )
             }
         }
 
@@ -1192,6 +1517,15 @@ open class CameraActivity : AppCompatActivity(R.layout.activity_camera) {
                         ExtensionMode.FACE_RETOUCH -> R.string.effect_face_retouch
                         ExtensionMode.AUTO -> R.string.effect_auto
                         else -> R.string.effect_none
+                    }
+                )
+
+                // Update BlackBerry Top Bar HDR button
+                btnBbHdr.setImageResource(
+                    when (photoEffect) {
+                        ExtensionMode.HDR -> R.drawable.ic_hdr_on_white_24dp
+                        ExtensionMode.AUTO -> R.drawable.ic_hdr_auto_white_24dp
+                        else -> R.drawable.ic_hdr_off_white_24dp
                     }
                 )
             }
@@ -1381,6 +1715,893 @@ open class CameraActivity : AppCompatActivity(R.layout.activity_camera) {
         }
     }
 
+    private fun updateOverlaysVisibility() {
+        val isAnyPopupOpen = bbModeGridContainer.isVisible ||
+                bbFilterRibbonContainer.isVisible ||
+                bbProControlsContainer.isVisible ||
+                llBbSubmenu.isVisible
+        val isCountdown = viewModel.cameraState.value == CameraState.COUNTDOWN
+        lensSelectorLayout.isVisible = !isAnyPopupOpen && !isCountdown
+    }
+
+    private fun setupBbUi() {
+        setupTopBarSubmenus()
+        setupProControls()
+
+        // Bottom deck mode button & grid
+        bbModeButton.setOnClickListener {
+            val show = !bbModeGridContainer.isVisible
+            bbModeGridContainer.isVisible = show
+            if (show) {
+                bbFilterRibbonContainer.isVisible = false
+                bbProControlsContainer.isVisible = false
+                llBbSubmenu.isVisible = false
+            }
+            updateModeGridHighlight()
+            updateOverlaysVisibility()
+        }
+
+        modeItemPhoto.setOnClickListener {
+            isPortraitMode = false
+            isPanoramaMode = false
+            scannerReticleLayout.isVisible = false
+            panoramaGuideLayout.isVisible = false
+            portraitGuideLayout.isVisible = false
+            bbProControlsContainer.isVisible = false
+            viewModel.setCameraMode(CameraMode.PHOTO)
+            bbModeGridContainer.isVisible = false
+            updateModeGridHighlight()
+            updateManualControls()
+            updateOverlaysVisibility()
+        }
+
+        modeItemVideo.setOnClickListener {
+            isPortraitMode = false
+            isPanoramaMode = false
+            scannerReticleLayout.isVisible = false
+            panoramaGuideLayout.isVisible = false
+            portraitGuideLayout.isVisible = false
+            bbProControlsContainer.isVisible = false
+            viewModel.setCameraMode(CameraMode.VIDEO)
+            bbModeGridContainer.isVisible = false
+            updateModeGridHighlight()
+            updateOverlaysVisibility()
+        }
+
+        modeItemPro.setOnClickListener {
+            isPortraitMode = false
+            isPanoramaMode = false
+            scannerReticleLayout.isVisible = false
+            panoramaGuideLayout.isVisible = false
+            portraitGuideLayout.isVisible = false
+            val show = !bbProControlsContainer.isVisible
+            bbProControlsContainer.isVisible = show
+            bbEvDial.isVisible = show
+            bbProSubmenuScroll.isVisible = false
+            if (show && viewModel.cameraMode.value != CameraMode.PHOTO) {
+                viewModel.setCameraMode(CameraMode.PHOTO)
+            }
+            bbModeGridContainer.isVisible = false
+            updateModeGridHighlight()
+            updateOverlaysVisibility()
+        }
+
+        modeItemPortrait.setOnClickListener {
+            isPortraitMode = true
+            isPanoramaMode = false
+            scannerReticleLayout.isVisible = false
+            panoramaGuideLayout.isVisible = false
+            portraitGuideLayout.isVisible = true
+            bbProControlsContainer.isVisible = false
+            isHdrEnabled = false
+            viewModel.setCameraMode(CameraMode.PHOTO)
+            updateManualControls()
+            bbModeGridContainer.isVisible = false
+            updateModeGridHighlight()
+            updateOverlaysVisibility()
+            Toast.makeText(this, "Mode Retrat activat", Toast.LENGTH_SHORT).show()
+        }
+
+        modeItemPanorama.setOnClickListener {
+            isPortraitMode = false
+            isPanoramaMode = true
+            scannerReticleLayout.isVisible = false
+            panoramaGuideLayout.isVisible = true
+            portraitGuideLayout.isVisible = false
+            bbProControlsContainer.isVisible = false
+            isSquareMode = false
+            is3_2Mode = false
+            viewFinder.scaleType = PreviewView.ScaleType.FIT_CENTER
+            viewModel.setCameraMode(CameraMode.PHOTO)
+            viewModel.setPhotoAspectRatio(AspectRatio.RATIO_16_9)
+            btnBbAspectRatio.setImageResource(R.drawable.ic_ratio_16_9_white_24dp)
+            bbModeGridContainer.isVisible = false
+            updateModeGridHighlight()
+            updateOverlaysVisibility()
+            Toast.makeText(this, "Panoràmica: Mantingues el dispositiu anivellat", Toast.LENGTH_SHORT).show()
+        }
+
+        modeItemScanner.setOnClickListener {
+            isPortraitMode = false
+            isPanoramaMode = false
+            scannerReticleLayout.isVisible = true
+            panoramaGuideLayout.isVisible = false
+            portraitGuideLayout.isVisible = false
+            bbProControlsContainer.isVisible = false
+            viewModel.setCameraMode(CameraMode.QR)
+            bbModeGridContainer.isVisible = false
+            updateModeGridHighlight()
+            updateOverlaysVisibility()
+            Toast.makeText(this, "Escàner de documents i codis", Toast.LENGTH_SHORT).show()
+        }
+
+        // Live filter ribbon
+        bbFilterButton.setOnClickListener {
+            val show = !bbFilterRibbonContainer.isVisible
+            bbFilterRibbonContainer.isVisible = show
+            if (show) {
+                bbModeGridContainer.isVisible = false
+                bbProControlsContainer.isVisible = false
+                llBbSubmenu.isVisible = false
+                setupFilterRibbon()
+            }
+            updateOverlaysVisibility()
+        }
+    }
+
+    private fun updateModeGridHighlight() {
+        val currentMode = viewModel.cameraMode.value
+        val isPro = bbProControlsContainer.isVisible
+
+        ivModeIconPhoto.setBackgroundResource(if (!isPortraitMode && !isPanoramaMode && !isPro && currentMode == CameraMode.PHOTO) R.drawable.bb_mode_icon_bg_selected else R.drawable.bb_mode_icon_bg)
+        ivModeIconVideo.setBackgroundResource(if (currentMode == CameraMode.VIDEO) R.drawable.bb_mode_icon_bg_selected else R.drawable.bb_mode_icon_bg)
+        ivModeIconPro.setBackgroundResource(if (isPro) R.drawable.bb_mode_icon_bg_selected else R.drawable.bb_mode_icon_bg)
+        ivModeIconPortrait.setBackgroundResource(if (isPortraitMode) R.drawable.bb_mode_icon_bg_selected else R.drawable.bb_mode_icon_bg)
+        ivModeIconPanorama.setBackgroundResource(if (isPanoramaMode) R.drawable.bb_mode_icon_bg_selected else R.drawable.bb_mode_icon_bg)
+        ivModeIconScanner.setBackgroundResource(if (currentMode == CameraMode.QR) R.drawable.bb_mode_icon_bg_selected else R.drawable.bb_mode_icon_bg)
+
+        bbModeButton.setImageResource(
+            when {
+                isPortraitMode -> R.drawable.ic_mode_portrait
+                isPanoramaMode -> R.drawable.ic_mode_pano
+                isPro -> R.drawable.ic_mode_pro
+                currentMode == CameraMode.VIDEO -> R.drawable.ic_mode_video
+                currentMode == CameraMode.QR -> R.drawable.ic_mode_scanner
+                else -> R.drawable.ic_mode_photo
+            }
+        )
+    }
+
+    private fun setupTopBarSubmenus() {
+        btnBbFlash.setOnClickListener {
+            if (llBbSubmenu.isVisible && llBbSubmenu.tag == "flash") {
+                llBbSubmenu.isVisible = false
+            } else {
+                showFlashSubmenu()
+            }
+            updateOverlaysVisibility()
+        }
+
+        btnBbTimer.setOnClickListener {
+            if (llBbSubmenu.isVisible && llBbSubmenu.tag == "timer") {
+                llBbSubmenu.isVisible = false
+            } else {
+                showTimerSubmenu()
+            }
+            updateOverlaysVisibility()
+        }
+
+        btnBbAspectRatio.setOnClickListener {
+            if (llBbSubmenu.isVisible && llBbSubmenu.tag == "ratio") {
+                llBbSubmenu.isVisible = false
+            } else {
+                showAspectRatioSubmenu()
+            }
+            updateOverlaysVisibility()
+        }
+
+        btnBbHdr.setOnClickListener {
+            if (llBbSubmenu.isVisible && llBbSubmenu.tag == "hdr") {
+                llBbSubmenu.isVisible = false
+            } else {
+                showHdrSubmenu()
+            }
+            updateOverlaysVisibility()
+        }
+
+        btnBbSettings.setOnClickListener {
+            openSettings()
+        }
+    }
+
+    private fun showFlashSubmenu() {
+        llBbSubmenu.removeAllViews()
+        llBbSubmenu.tag = "flash"
+        llBbSubmenu.isVisible = true
+        updateOverlaysVisibility()
+
+        val row = LinearLayout(this).apply {
+            layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+            setPadding(12.px, 6.px, 12.px, 6.px)
+        }
+
+        val currentFlash = viewModel.flashMode.value
+        val options = listOf(
+            Triple(FlashMode.OFF, R.drawable.ic_flash_off_white_24dp, "OFF"),
+            Triple(FlashMode.AUTO, R.drawable.ic_flash_auto_white_24dp, "AUTO"),
+            Triple(FlashMode.ON, R.drawable.ic_flash_on_white_24dp, "ON")
+        )
+
+        for ((mode, iconRes, label) in options) {
+            val isSelected = currentFlash == mode
+            val btn = Button(this).apply {
+                layoutParams = LinearLayout.LayoutParams(0, 36.px, 1f).apply {
+                    setMargins(4.px, 0, 4.px, 0)
+                }
+                text = label
+                textSize = 10f
+                setTextColor(if (isSelected) Color.BLACK else Color.WHITE)
+                typeface = Typeface.DEFAULT_BOLD
+                setBackgroundResource(R.drawable.lens_selector_button_background)
+                backgroundTintList = ColorStateList.valueOf(
+                    if (isSelected) Color.WHITE else Color.parseColor("#33FFFFFF")
+                )
+                setCompoundDrawablesWithIntrinsicBounds(iconRes, 0, 0, 0)
+                compoundDrawableTintList = ColorStateList.valueOf(if (isSelected) Color.BLACK else Color.WHITE)
+                compoundDrawablePadding = 4.px
+                gravity = Gravity.CENTER
+                setPadding(8.px, 2.px, 8.px, 2.px)
+                setOnClickListener {
+                    viewModel.setFlashMode(mode)
+                    btnBbFlash.setImageResource(iconRes)
+                    llBbSubmenu.isVisible = false
+                    updateOverlaysVisibility()
+                }
+            }
+            row.addView(btn)
+        }
+        llBbSubmenu.addView(row)
+    }
+
+    private fun showTimerSubmenu() {
+        llBbSubmenu.removeAllViews()
+        llBbSubmenu.tag = "timer"
+        llBbSubmenu.isVisible = true
+        updateOverlaysVisibility()
+
+        val row = LinearLayout(this).apply {
+            layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+            setPadding(12.px, 6.px, 12.px, 6.px)
+        }
+
+        val currentTimer = viewModel.timerMode.value
+        val options = listOf(
+            Triple(TimerMode.OFF, R.drawable.ic_timer_off_white_24dp, "OFF"),
+            Triple(TimerMode.ON_3S, R.drawable.ic_timer_3_white_24dp, "3s"),
+            Triple(TimerMode.ON_10S, R.drawable.ic_timer_10_white_24dp, "10s")
+        )
+
+        for ((mode, iconRes, label) in options) {
+            val isSelected = currentTimer == mode
+            val btn = Button(this).apply {
+                layoutParams = LinearLayout.LayoutParams(0, 36.px, 1f).apply {
+                    setMargins(4.px, 0, 4.px, 0)
+                }
+                text = label
+                textSize = 10f
+                setTextColor(if (isSelected) Color.BLACK else Color.WHITE)
+                typeface = Typeface.DEFAULT_BOLD
+                setBackgroundResource(R.drawable.lens_selector_button_background)
+                backgroundTintList = ColorStateList.valueOf(
+                    if (isSelected) Color.WHITE else Color.parseColor("#33FFFFFF")
+                )
+                setCompoundDrawablesWithIntrinsicBounds(iconRes, 0, 0, 0)
+                compoundDrawableTintList = ColorStateList.valueOf(if (isSelected) Color.BLACK else Color.WHITE)
+                compoundDrawablePadding = 4.px
+                gravity = Gravity.CENTER
+                setPadding(8.px, 2.px, 8.px, 2.px)
+                setOnClickListener {
+                    viewModel.setTimerMode(mode)
+                    btnBbTimer.setImageResource(iconRes)
+                    llBbSubmenu.isVisible = false
+                    updateOverlaysVisibility()
+                }
+            }
+            row.addView(btn)
+        }
+        llBbSubmenu.addView(row)
+    }
+
+    data class RatioOption(
+        val iconRes: Int,
+        val ratio: Int,
+        val isSquare: Boolean,
+        val is3_2: Boolean,
+        val name: String
+    )
+
+    private fun showAspectRatioSubmenu() {
+        llBbSubmenu.removeAllViews()
+        llBbSubmenu.tag = "ratio"
+        llBbSubmenu.isVisible = true
+        updateOverlaysVisibility()
+
+        // 1. Aspect Ratio selector row
+        val ratioRow = LinearLayout(this).apply {
+            layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+            setPadding(8.px, 4.px, 8.px, 4.px)
+        }
+
+        val ratioOptions = listOf(
+            RatioOption(R.drawable.ic_ratio_4_3_white_24dp, AspectRatio.RATIO_4_3, false, false, "4:3"),
+            RatioOption(R.drawable.ic_ratio_16_9_white_24dp, AspectRatio.RATIO_16_9, false, false, "16:9"),
+            RatioOption(R.drawable.ic_ratio_square_white_24dp, AspectRatio.RATIO_4_3, true, false, "1:1"),
+            RatioOption(R.drawable.ic_ratio_3_2_white_24dp, AspectRatio.RATIO_4_3, false, true, "3:2")
+        )
+
+        for (opt in ratioOptions) {
+            val isCurrent = when {
+                opt.isSquare -> isSquareMode
+                opt.is3_2 -> is3_2Mode
+                else -> !isSquareMode && !is3_2Mode && currentSelectedRatio == opt.ratio
+            }
+
+            val btn = ImageButton(this).apply {
+                layoutParams = LinearLayout.LayoutParams(0, 36.px, 1f).apply {
+                    setMargins(4.px, 0, 4.px, 0)
+                }
+                setBackgroundResource(if (isCurrent) R.drawable.lens_selector_button_background else android.R.color.transparent)
+                backgroundTintList = ColorStateList.valueOf(
+                    if (isCurrent) Color.WHITE else Color.parseColor("#33FFFFFF")
+                )
+                setImageResource(opt.iconRes)
+                imageTintList = ColorStateList.valueOf(if (isCurrent) Color.BLACK else Color.WHITE)
+                setPadding(6.px, 6.px, 6.px, 6.px)
+                scaleType = ImageView.ScaleType.CENTER_INSIDE
+                setOnClickListener {
+                    currentSelectedRatio = opt.ratio
+                    isSquareMode = opt.isSquare
+                    is3_2Mode = opt.is3_2
+                    if (opt.isSquare) {
+                        viewFinder.scaleType = PreviewView.ScaleType.FILL_CENTER
+                    } else {
+                        viewFinder.scaleType = PreviewView.ScaleType.FIT_CENTER
+                    }
+                    btnBbAspectRatio.setImageResource(opt.iconRes)
+
+                    // Ensure target resolution matches this format
+                    val resList = when {
+                        isSquareMode -> resolutions1_1
+                        is3_2Mode -> resolutions3_2
+                        currentSelectedRatio == AspectRatio.RATIO_16_9 -> resolutions16_9
+                        else -> resolutions4_3
+                    }
+                    val def = resList.getOrNull(1) ?: resList.first()
+                    currentTargetResolution = def.size
+                    currentResolutionLabel = def.label
+
+                    if (viewModel.photoAspectRatio.value != opt.ratio) {
+                        viewModel.setPhotoAspectRatio(opt.ratio)
+                    } else {
+                        viewModel.rebindCamera()
+                    }
+                    showAspectRatioSubmenu()
+                }
+            }
+            ratioRow.addView(btn)
+        }
+        llBbSubmenu.addView(ratioRow)
+
+        // 2. Divider / Header
+        val header = TextView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                setMargins(0, 6.px, 0, 4.px)
+            }
+            text = getString(R.string.bb_resolution_header, currentResolutionLabel)
+            textSize = 10f
+            setTextColor(Color.parseColor("#BBBBBB"))
+            typeface = Typeface.DEFAULT_BOLD
+        }
+        llBbSubmenu.addView(header)
+
+        // 3. Resolutions row
+        val resList = when {
+            isSquareMode -> resolutions1_1
+            is3_2Mode -> resolutions3_2
+            currentSelectedRatio == AspectRatio.RATIO_16_9 -> resolutions16_9
+            else -> resolutions4_3
+        }
+
+        val scroll = HorizontalScrollView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+            isHorizontalScrollBarEnabled = false
+        }
+        val resRow = LinearLayout(this).apply {
+            layoutParams = FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                Gravity.CENTER_HORIZONTAL
+            )
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(12.px, 2.px, 12.px, 2.px)
+        }
+
+        for (opt in resList) {
+            val isSelected = currentTargetResolution == opt.size || (currentTargetResolution == null && opt == resList.getOrNull(1))
+            val btn = Button(this).apply {
+                layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, 36.px).apply {
+                    setMargins(4.px, 0, 4.px, 0)
+                }
+                text = "${opt.label}\n${opt.mp}"
+                textSize = 9f
+                setLineSpacing(0f, 0.9f)
+                setTextColor(if (isSelected) Color.BLACK else Color.WHITE)
+                typeface = Typeface.DEFAULT_BOLD
+                setBackgroundResource(R.drawable.lens_selector_button_background)
+                backgroundTintList = ColorStateList.valueOf(
+                    if (isSelected) Color.WHITE else Color.parseColor("#33FFFFFF")
+                )
+                setPadding(10.px, 2.px, 10.px, 2.px)
+                setOnClickListener {
+                    currentTargetResolution = opt.size
+                    currentResolutionLabel = opt.label
+                    viewModel.rebindCamera()
+                    Toast.makeText(this@CameraActivity, "${opt.label} (${opt.mp})", Toast.LENGTH_SHORT).show()
+                    showAspectRatioSubmenu()
+                }
+            }
+            resRow.addView(btn)
+        }
+        scroll.addView(resRow)
+        llBbSubmenu.addView(scroll)
+
+        // 4. Capture mode options (Min latency or Max quality)
+        val captureHeader = TextView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                setMargins(0, 6.px, 0, 4.px)
+            }
+            text = getString(R.string.bb_capture_mode_header)
+            textSize = 10f
+            setTextColor(Color.parseColor("#BBBBBB"))
+            typeface = Typeface.DEFAULT_BOLD
+        }
+        llBbSubmenu.addView(captureHeader)
+
+        val captureModeRow = LinearLayout(this).apply {
+            layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+            setPadding(12.px, 2.px, 12.px, 4.px)
+        }
+
+        val currentCaptureMode = viewModel.getPhotoCaptureModePreference()
+        val isMinLatency = currentCaptureMode == ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY
+        val isMaxQuality = currentCaptureMode == ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY
+        val isZsl = viewModel.getEnableZslPreference()
+
+        val primaryOptions = listOf(
+            Triple(getString(R.string.bb_min_latency), isMinLatency) {
+                viewModel.setCaptureModePreference(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY, isZsl)
+                viewModel.rebindCamera()
+                Toast.makeText(this@CameraActivity, getString(R.string.bb_toast_min_latency), Toast.LENGTH_SHORT).show()
+                showAspectRatioSubmenu()
+            },
+            Triple(getString(R.string.bb_max_quality), isMaxQuality) {
+                viewModel.setCaptureModePreference(ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY, false)
+                viewModel.rebindCamera()
+                Toast.makeText(this@CameraActivity, getString(R.string.bb_toast_max_quality), Toast.LENGTH_SHORT).show()
+                showAspectRatioSubmenu()
+            }
+        )
+
+        for ((label, isSelected, onClick) in primaryOptions) {
+            val btn = Button(this).apply {
+                layoutParams = LinearLayout.LayoutParams(0, 36.px, 1f).apply {
+                    setMargins(4.px, 0, 4.px, 0)
+                }
+                text = label
+                textSize = 10f
+                setTextColor(if (isSelected) Color.BLACK else Color.WHITE)
+                typeface = Typeface.DEFAULT_BOLD
+                setBackgroundResource(R.drawable.lens_selector_button_background)
+                backgroundTintList = ColorStateList.valueOf(
+                    if (isSelected) Color.WHITE else Color.parseColor("#33FFFFFF")
+                )
+                setPadding(6.px, 2.px, 6.px, 2.px)
+                setOnClickListener { onClick() }
+            }
+            captureModeRow.addView(btn)
+        }
+        llBbSubmenu.addView(captureModeRow)
+
+        // 5. If min latency is selected: show ZSL toggle options!
+        if (isMinLatency) {
+            val zslRow = LinearLayout(this).apply {
+                layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER
+                setPadding(12.px, 2.px, 12.px, 6.px)
+            }
+
+            val zslOptions = listOf(
+                Triple(getString(R.string.bb_zsl_enabled), isZsl) {
+                    viewModel.setCaptureModePreference(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY, true)
+                    viewModel.rebindCamera()
+                    Toast.makeText(this@CameraActivity, getString(R.string.bb_toast_zsl_on), Toast.LENGTH_SHORT).show()
+                    showAspectRatioSubmenu()
+                },
+                Triple(getString(R.string.bb_zsl_disabled), !isZsl) {
+                    viewModel.setCaptureModePreference(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY, false)
+                    viewModel.rebindCamera()
+                    Toast.makeText(this@CameraActivity, getString(R.string.bb_toast_zsl_off), Toast.LENGTH_SHORT).show()
+                    showAspectRatioSubmenu()
+                }
+            )
+
+            for ((label, isSelected, onClick) in zslOptions) {
+                val btn = Button(this).apply {
+                    layoutParams = LinearLayout.LayoutParams(0, 32.px, 1f).apply {
+                        setMargins(4.px, 0, 4.px, 0)
+                    }
+                    text = label
+                    textSize = 9.5f
+                    setTextColor(if (isSelected) Color.BLACK else Color.WHITE)
+                    typeface = Typeface.DEFAULT_BOLD
+                    setBackgroundResource(R.drawable.lens_selector_button_background)
+                    backgroundTintList = ColorStateList.valueOf(
+                        if (isSelected) Color.WHITE else Color.parseColor("#22FFFFFF")
+                    )
+                    setPadding(6.px, 2.px, 6.px, 2.px)
+                    setOnClickListener { onClick() }
+                }
+                zslRow.addView(btn)
+            }
+            llBbSubmenu.addView(zslRow)
+        }
+    }
+
+    private fun showHdrSubmenu() {
+        llBbSubmenu.removeAllViews()
+        llBbSubmenu.tag = "hdr"
+        llBbSubmenu.isVisible = true
+        updateOverlaysVisibility()
+
+        val row = LinearLayout(this).apply {
+            layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+            setPadding(12.px, 6.px, 12.px, 6.px)
+        }
+
+        val options = listOf(
+            Triple(false, R.drawable.ic_hdr_off_white_24dp, "HDR OFF"),
+            Triple(true, R.drawable.ic_hdr_auto_white_24dp, "HDR AUTO"),
+            Triple(true, R.drawable.ic_hdr_on_white_24dp, "HDR ON")
+        )
+
+        for ((enabled, iconRes, label) in options) {
+            val isSelected = (enabled == isHdrEnabled && (if (enabled) btnBbHdr.tag == label else true))
+            val btn = Button(this).apply {
+                layoutParams = LinearLayout.LayoutParams(0, 36.px, 1f).apply {
+                    setMargins(4.px, 0, 4.px, 0)
+                }
+                text = label.replace("HDR ", "")
+                textSize = 10f
+                setTextColor(if (isSelected) Color.BLACK else Color.WHITE)
+                typeface = Typeface.DEFAULT_BOLD
+                setBackgroundResource(R.drawable.lens_selector_button_background)
+                backgroundTintList = ColorStateList.valueOf(
+                    if (isSelected) Color.WHITE else Color.parseColor("#33FFFFFF")
+                )
+                setCompoundDrawablesWithIntrinsicBounds(iconRes, 0, 0, 0)
+                compoundDrawableTintList = ColorStateList.valueOf(if (isSelected) Color.BLACK else Color.WHITE)
+                compoundDrawablePadding = 4.px
+                gravity = Gravity.CENTER
+                setPadding(8.px, 2.px, 8.px, 2.px)
+                setOnClickListener {
+                    isHdrEnabled = enabled
+                    btnBbHdr.tag = label
+                    updateManualControls()
+                    btnBbHdr.setImageResource(iconRes)
+                    llBbSubmenu.isVisible = false
+                    updateOverlaysVisibility()
+                    Toast.makeText(
+                        this@CameraActivity,
+                        if (enabled) "$label activat" else "HDR desactivat",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+            }
+            row.addView(btn)
+        }
+        llBbSubmenu.addView(row)
+    }
+
+    private fun setupProControls() {
+        btnProEv.setOnClickListener {
+            bbEvDial.isVisible = !bbEvDial.isVisible
+            bbProSubmenuScroll.isVisible = false
+        }
+
+        btnProIso.setOnClickListener {
+            showProSubmenu("ISO", listOf("AUTO", "100", "200", "400", "800", "1600", "3200")) { value ->
+                currentIso = if (value == "AUTO") null else value.toIntOrNull()
+                btnProIso.text = if (currentIso == null) "ISO" else "ISO $currentIso"
+                updateManualControls()
+            }
+        }
+
+        btnProShutter.setOnClickListener {
+            val shutterOptions = listOf(
+                "AUTO" to null,
+                "1/1000s" to 1_000_000L,
+                "1/500s" to 2_000_000L,
+                "1/250s" to 4_000_000L,
+                "1/125s" to 8_000_000L,
+                "1/60s" to 16_666_666L,
+                "1/30s" to 33_333_333L,
+                "1/15s" to 66_666_666L,
+                "1/8s" to 125_000_000L,
+                "1/4s" to 250_000_000L,
+                "1/2s" to 500_000_000L
+            )
+            showProSubmenu("SEC", shutterOptions.map { it.first }) { label ->
+                currentExposureNanos = shutterOptions.firstOrNull { it.first == label }?.second
+                btnProShutter.text = if (currentExposureNanos == null) "SEC" else label
+                updateManualControls()
+            }
+        }
+
+        btnProWb.setOnClickListener {
+            val wbOptions = listOf(
+                "AUTO" to null,
+                "Incandescent" to CameraMetadata.CONTROL_AWB_MODE_INCANDESCENT,
+                "Fluorescent" to CameraMetadata.CONTROL_AWB_MODE_FLUORESCENT,
+                "Daylight" to CameraMetadata.CONTROL_AWB_MODE_DAYLIGHT,
+                "Cloudy" to CameraMetadata.CONTROL_AWB_MODE_CLOUDY_DAYLIGHT
+            )
+            showProSubmenu("WB", wbOptions.map { it.first }) { label ->
+                currentAwbMode = wbOptions.firstOrNull { it.first == label }?.second
+                btnProWb.text = if (currentAwbMode == null) "WB" else label.take(4)
+                updateManualControls()
+            }
+        }
+
+        btnProMf.setOnClickListener {
+            val focusOptions = listOf(
+                "AUTO" to null,
+                "Macro" to 10.0f,
+                "Infinit" to 0.0f
+            )
+            showProSubmenu("MF", focusOptions.map { it.first }) { label ->
+                currentFocusDistance = focusOptions.firstOrNull { it.first == label }?.second
+                btnProMf.text = if (currentFocusDistance == null) "MF" else label
+                updateManualControls()
+            }
+        }
+
+        btnProAuto.setOnClickListener {
+            currentIso = null
+            currentExposureNanos = null
+            currentAwbMode = null
+            currentFocusDistance = null
+            btnProIso.text = "ISO"
+            btnProShutter.text = "SEC"
+            btnProWb.text = "WB"
+            btnProMf.text = "MF"
+            val zeroTick = findViewById<View>(R.id.evTick_0)
+            if (zeroTick != null) {
+                setEv(0f, zeroTick)
+            }
+            updateManualControls()
+            bbProSubmenuScroll.isVisible = false
+            Toast.makeText(this, "Pro: Tot en mode Automàtic", Toast.LENGTH_SHORT).show()
+        }
+
+        // Ticks for EV dial
+        val evTicks = listOf(
+            findViewById<View>(R.id.evTick_m15) to -1.5f,
+            findViewById<View>(R.id.evTick_m10) to -1.0f,
+            findViewById<View>(R.id.evTick_m05) to -0.5f,
+            findViewById<View>(R.id.evTick_0) to 0.0f,
+            findViewById<View>(R.id.evTick_p05) to 0.5f,
+            findViewById<View>(R.id.evTick_p10) to 1.0f,
+            findViewById<View>(R.id.evTick_p15) to 1.5f
+        )
+        for ((tickView, evValue) in evTicks) {
+            tickView?.setOnClickListener {
+                setEv(evValue, tickView)
+            }
+        }
+    }
+
+    private fun setEv(ev: Float, targetView: View) {
+        val state = viewModel.cameraController.cameraInfo?.exposureState
+        if (state != null && state.isExposureCompensationSupported) {
+            val step = state.exposureCompensationStep.toFloat()
+            val index = if (step > 0) Math.round(ev / step) else 0
+            val clamped = index.coerceIn(state.exposureCompensationRange.lower, state.exposureCompensationRange.upper)
+            viewModel.cameraController.cameraControl?.setExposureCompensationIndex(clamped)
+        }
+        targetView.post {
+            val centerX = targetView.x + targetView.width / 2f
+            tvEvIndicator.x = centerX - tvEvIndicator.width / 2f
+        }
+    }
+
+    private fun showProSubmenu(tag: String, items: List<String>, onSelect: (String) -> Unit) {
+        if (bbProSubmenuScroll.isVisible && bbProSubmenuScroll.tag == tag) {
+            bbProSubmenuScroll.isVisible = false
+            return
+        }
+        bbProSubmenuScroll.tag = tag
+        bbProSubmenuList.removeAllViews()
+        bbProSubmenuScroll.isVisible = true
+
+        for (item in items) {
+            val tv = TextView(this).apply {
+                text = item
+                setTextColor(Color.WHITE)
+                textSize = 14f
+                typeface = Typeface.DEFAULT_BOLD
+                setPadding(18.px, 10.px, 18.px, 10.px)
+                setBackgroundResource(R.drawable.lens_selector_button_background)
+                backgroundTintList = ColorStateList.valueOf(Color.parseColor("#33FFFFFF"))
+                val lp = LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                    setMargins(6.px, 0, 6.px, 0)
+                }
+                layoutParams = lp
+                setOnClickListener {
+                    onSelect(item)
+                    bbProSubmenuScroll.isVisible = false
+                }
+            }
+            bbProSubmenuList.addView(tv)
+        }
+    }
+
+    @androidx.camera.camera2.interop.ExperimentalCamera2Interop
+    private fun updateManualControls() {
+        val camera2Control = viewModel.cameraController.camera2CameraControl ?: return
+        val builder = CaptureRequestOptions.Builder()
+        if (currentIso != null || currentExposureNanos != null) {
+            builder.setCaptureRequestOption(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_OFF)
+            currentIso?.let { builder.setCaptureRequestOption(CaptureRequest.SENSOR_SENSITIVITY, it) }
+            currentExposureNanos?.let { builder.setCaptureRequestOption(CaptureRequest.SENSOR_EXPOSURE_TIME, it) }
+        } else {
+            builder.setCaptureRequestOption(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_ON)
+        }
+        if (currentFocusDistance != null) {
+            builder.setCaptureRequestOption(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_OFF)
+            builder.setCaptureRequestOption(CaptureRequest.LENS_FOCUS_DISTANCE, currentFocusDistance)
+        } else {
+            builder.setCaptureRequestOption(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE)
+        }
+        if (currentAwbMode != null) {
+            builder.setCaptureRequestOption(CaptureRequest.CONTROL_AWB_MODE, currentAwbMode)
+        } else {
+            builder.setCaptureRequestOption(CaptureRequest.CONTROL_AWB_MODE, CaptureRequest.CONTROL_AWB_MODE_AUTO)
+        }
+        if (isHdrEnabled) {
+            builder.setCaptureRequestOption(CaptureRequest.CONTROL_MODE, CameraMetadata.CONTROL_MODE_USE_SCENE_MODE)
+            builder.setCaptureRequestOption(CaptureRequest.CONTROL_SCENE_MODE, CameraMetadata.CONTROL_SCENE_MODE_HDR)
+        } else if (isPortraitMode) {
+            builder.setCaptureRequestOption(CaptureRequest.CONTROL_MODE, CameraMetadata.CONTROL_MODE_USE_SCENE_MODE)
+            builder.setCaptureRequestOption(CaptureRequest.CONTROL_SCENE_MODE, CameraMetadata.CONTROL_SCENE_MODE_PORTRAIT)
+        } else {
+            builder.setCaptureRequestOption(CaptureRequest.CONTROL_MODE, CameraMetadata.CONTROL_MODE_AUTO)
+            builder.setCaptureRequestOption(CaptureRequest.CONTROL_SCENE_MODE, CameraMetadata.CONTROL_SCENE_MODE_DISABLED)
+        }
+        camera2Control.setCaptureRequestOptions(builder.build())
+    }
+
+    private fun setupFilterRibbon() {
+        bbFilterItemList.removeAllViews()
+        for (filter in BbFilter.entries) {
+            val itemView = layoutInflater.inflate(R.layout.bb_filter_item, bbFilterItemList, false)
+            val tvTitle = itemView.findViewById<TextView>(R.id.tvFilterTitle)
+            val ivThumbnail = itemView.findViewById<ImageView>(R.id.ivFilterThumbnail)
+            val card = itemView.findViewById<MaterialCardView>(R.id.cardFilterThumbnail)
+
+            tvTitle.setText(filter.titleRes)
+            ivThumbnail.setImageResource(filter.drawableRes)
+
+            val isSelected = filter == currentBbFilter
+            card.strokeWidth = if (isSelected) 3.px else 0
+            card.strokeColor = Color.WHITE
+
+            itemView.setOnClickListener {
+                applyFilter(filter)
+                setupFilterRibbon()
+            }
+            bbFilterItemList.addView(itemView)
+        }
+    }
+
+    private fun applyFilter(filter: BbFilter) {
+        currentBbFilter = filter
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val effect = filter.colorMatrix?.let {
+                RenderEffect.createColorFilterEffect(ColorMatrixColorFilter(it))
+            }
+            viewFinder.setRenderEffect(effect)
+        }
+        bbFilterButton.setImageResource(
+            if (filter == BbFilter.NONE) R.drawable.ic_filter_off_color_24dp
+            else R.drawable.ic_filter_on_color_24dp
+        )
+    }
+
+    private fun processSavedPhoto(uri: Uri) {
+        try {
+            val bitmap = contentResolver.openInputStream(uri)?.use { inputStream ->
+                BitmapFactory.decodeStream(inputStream)
+            } ?: return
+
+            var outputBitmap = bitmap
+
+            // 1. Crop to square if in 1:1 mode, or 3:2 if in 3:2 mode
+            if (isSquareMode) {
+                val size = minOf(outputBitmap.width, outputBitmap.height)
+                val x = (outputBitmap.width - size) / 2
+                val y = (outputBitmap.height - size) / 2
+                outputBitmap = Bitmap.createBitmap(outputBitmap, x, y, size, size)
+            } else if (is3_2Mode) {
+                val targetHeight = (outputBitmap.width * 2) / 3
+                if (targetHeight <= outputBitmap.height) {
+                    val y = (outputBitmap.height - targetHeight) / 2
+                    outputBitmap = Bitmap.createBitmap(outputBitmap, 0, y, outputBitmap.width, targetHeight)
+                }
+            }
+
+            // 2. Scale to requested resolution if specified
+            val targetRes = currentTargetResolution
+            if (targetRes != null) {
+                val maxTarget = maxOf(targetRes.width, targetRes.height)
+                val maxCurr = maxOf(outputBitmap.width, outputBitmap.height)
+                if (maxCurr > maxTarget) {
+                    val scale = maxTarget.toFloat() / maxCurr.toFloat()
+                    val targetW = (outputBitmap.width * scale).toInt()
+                    val targetH = (outputBitmap.height * scale).toInt()
+                    val scaled = Bitmap.createScaledBitmap(outputBitmap, targetW, targetH, true)
+                    if (outputBitmap != bitmap) {
+                        outputBitmap.recycle()
+                    }
+                    outputBitmap = scaled
+                }
+            }
+
+            // 3. Apply color filter if not NONE
+            val filterMatrix = currentBbFilter.colorMatrix
+            if (filterMatrix != null) {
+                val filtered = Bitmap.createBitmap(
+                    outputBitmap.width,
+                    outputBitmap.height,
+                    outputBitmap.config ?: Bitmap.Config.ARGB_8888
+                )
+                val canvas = Canvas(filtered)
+                val paint = Paint().apply {
+                    colorFilter = ColorMatrixColorFilter(filterMatrix)
+                }
+                canvas.drawBitmap(outputBitmap, 0f, 0f, paint)
+                outputBitmap = filtered
+            }
+
+            // 4. Write back to URI
+            contentResolver.openOutputStream(uri, "wt")?.use { outputStream ->
+                outputBitmap.compress(Bitmap.CompressFormat.JPEG, 95, outputStream)
+            }
+        } catch (e: Exception) {
+            Log.e(LOG_TAG, "Failed to post-process photo", e)
+        }
+    }
+
     private suspend fun queueSetupWithCameraPermissions() {
         var initialized = false
 
@@ -1419,19 +2640,15 @@ open class CameraActivity : AppCompatActivity(R.layout.activity_camera) {
     }
 
     private fun startShutterAnimation(shutterAnimation: ShutterAnimation) {
-        // Get appropriate drawable
         val drawable = ContextCompat.getDrawable(
             this, shutterAnimation.resourceId
         ) as AnimatedVectorDrawable
 
-        // Update current drawable
         shutterButton.setImageDrawable(drawable)
 
-        // Start or reset animation
         when (shutterAnimation) {
             ShutterAnimation.InitPhoto,
             ShutterAnimation.InitVideo -> drawable.reset()
-
             else -> drawable.start()
         }
     }
@@ -1519,22 +2736,45 @@ open class CameraActivity : AppCompatActivity(R.layout.activity_camera) {
                     PhotoOutputFormat.RAW_JPEG -> ImageCapture.OUTPUT_FORMAT_RAW_JPEG
                 }
 
-                viewModel.cameraController.imageCaptureResolutionSelector =
-                    ResolutionSelector.Builder()
-                        .setAspectRatioStrategy(
-                            AspectRatioStrategy(
-                                cameraConfiguration.photoAspectRatio,
-                                AspectRatioStrategy.FALLBACK_RULE_AUTO,
-                            )
+                val currentRatio = if (isSquareMode || is3_2Mode) AspectRatio.RATIO_4_3 else currentSelectedRatio
+
+                val previewResSelector = ResolutionSelector.Builder()
+                    .setAspectRatioStrategy(
+                        AspectRatioStrategy(
+                            currentRatio,
+                            AspectRatioStrategy.FALLBACK_RULE_AUTO,
                         )
-                        .setAllowedResolutionMode(
-                            if (cameraConfiguration.enableHighResolution) {
-                                ResolutionSelector.PREFER_HIGHER_RESOLUTION_OVER_CAPTURE_RATE
-                            } else {
-                                ResolutionSelector.PREFER_CAPTURE_RATE_OVER_HIGHER_RESOLUTION
-                            }
+                    )
+                    .build()
+                viewModel.cameraController.previewResolutionSelector = previewResSelector
+
+                val resBuilder = ResolutionSelector.Builder()
+                    .setAspectRatioStrategy(
+                        AspectRatioStrategy(
+                            currentRatio,
+                            AspectRatioStrategy.FALLBACK_RULE_AUTO,
                         )
-                        .build()
+                    )
+
+                if (currentTargetResolution != null) {
+                    resBuilder.setResolutionStrategy(
+                        ResolutionStrategy(
+                            currentTargetResolution!!,
+                            ResolutionStrategy.FALLBACK_RULE_CLOSEST_HIGHER_THEN_LOWER
+                        )
+                    )
+                } else {
+                    resBuilder.setAllowedResolutionMode(
+                        if (cameraConfiguration.enableHighResolution) {
+                            ResolutionSelector.PREFER_HIGHER_RESOLUTION_OVER_CAPTURE_RATE
+                        } else {
+                            ResolutionSelector.PREFER_CAPTURE_RATE_OVER_HIGHER_RESOLUTION
+                        }
+                    )
+                }
+
+                val builtResSelector = resBuilder.build()
+                viewModel.cameraController.imageCaptureResolutionSelector = builtResSelector
 
                 CameraController.IMAGE_CAPTURE
             }
@@ -1939,129 +3179,192 @@ open class CameraActivity : AppCompatActivity(R.layout.activity_camera) {
         }
     }
 
+    private fun adjustZoomByStep(step: Float) {
+        val currentLinear = viewModel.zoomState.value?.linearZoom ?: 0f
+        val newLinear = (currentLinear + step).coerceIn(0f, 1f)
+        viewModel.cameraController.setLinearZoom(newLinear)
+        zoomLevel.progress = newLinear
+        zoomLevel.isVisible = true
+        handler.removeMessages(MSG_HIDE_ZOOM_SLIDER)
+        handler.sendMessageDelayed(handler.obtainMessage(MSG_HIDE_ZOOM_SLIDER), 2500)
+    }
+
+    override fun onGenericMotionEvent(event: MotionEvent): Boolean {
+        val vScroll = event.getAxisValue(MotionEvent.AXIS_VSCROLL)
+        if (abs(vScroll) > 0.001f) {
+            adjustZoomByStep(vScroll * 0.05f)
+            return true
+        }
+        return super.onGenericMotionEvent(event)
+    }
+
+    override fun onTrackballEvent(event: MotionEvent): Boolean {
+        if (event.action == MotionEvent.ACTION_MOVE) {
+            val deltaY = -event.y
+            if (abs(deltaY) > 0.001f) {
+                adjustZoomByStep(deltaY * 0.05f)
+                return true
+            }
+        }
+        return super.onTrackballEvent(event)
+    }
+
     private fun handleHardwareKeyDown(
         keyCode: Int, event: KeyEvent?
-    ) = HardwareKey.match(keyCode)?.let { (hardwareKey, tempIncrease) ->
-        val increase = when (viewModel.getHardwareKeyInvert(hardwareKey)) {
-            true -> !tempIncrease
-            false -> tempIncrease
+    ): Boolean? {
+        if (keyCode == KeyEvent.KEYCODE_SPACE || keyCode == KeyEvent.KEYCODE_ENTER || keyCode == KeyEvent.KEYCODE_NUMPAD_ENTER || keyCode == KeyEvent.KEYCODE_DPAD_CENTER) {
+            if (viewModel.cameraMode.value == CameraMode.VIDEO
+                && viewModel.isShutterButtonEnabled.value
+                && event?.repeatCount == 0
+            ) {
+                shutterButton.performClick()
+            }
+            return true
         }
 
-        val gestureAction = viewModel.getHardwareKeyAction(hardwareKey)
-
-        if (gestureAction.isTwoWayAction && !hardwareKey.isTwoWayKey) {
-            Log.wtf(
-                LOG_TAG,
-                "${gestureAction.name} requires two-way key but ${hardwareKey.name} is not"
-            )
-            return@let true
+        if (keyCode == KeyEvent.KEYCODE_DPAD_UP) {
+            adjustZoomByStep(0.05f)
+            return true
         }
 
-        when (gestureAction) {
-            GestureAction.SHUTTER -> {
-                if (viewModel.cameraMode.value == CameraMode.VIDEO
-                    && viewModel.isShutterButtonEnabled.value
-                    && event?.repeatCount == 0
-                ) {
-                    shutterButton.performClick()
-                }
-                true
+        if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
+            adjustZoomByStep(-0.05f)
+            return true
+        }
+
+        return HardwareKey.match(keyCode)?.let { (hardwareKey, tempIncrease) ->
+            val increase = when (viewModel.getHardwareKeyInvert(hardwareKey)) {
+                true -> !tempIncrease
+                false -> tempIncrease
             }
 
-            GestureAction.FOCUS -> {
-                if (event?.repeatCount == 0) {
-                    viewFinderTouchEvent = null
-                    viewFinder.performClick()
-                }
-                true
+            val gestureAction = viewModel.getHardwareKeyAction(hardwareKey)
+
+            if (gestureAction.isTwoWayAction && !hardwareKey.isTwoWayKey) {
+                Log.wtf(
+                    LOG_TAG,
+                    "${gestureAction.name} requires two-way key but ${hardwareKey.name} is not"
+                )
+                return@let true
             }
 
-            GestureAction.MIC_MUTE -> {
-                if (viewModel.cameraMode.value == CameraMode.VIDEO && micButton.isEnabled &&
-                    event?.repeatCount == 0
-                ) {
-                    viewModel.toggleVideoMicrophoneEnabled()
-                }
-                true
-            }
-
-            GestureAction.ZOOM -> {
-                when (increase) {
-                    true -> viewModel.zoomIn()
-                    false -> viewModel.zoomOut()
-                }
-                true
-            }
-
-            GestureAction.DEFAULT -> {
-                if (hardwareKey.supportsDefault) {
-                    super.onKeyDown(keyCode, event)
-                } else {
-                    Log.wtf(
-                        LOG_TAG,
-                        "Got GestureAction.DEFAULT for ${hardwareKey.name} which doesn't support it"
-                    )
+            when (gestureAction) {
+                GestureAction.SHUTTER -> {
+                    if (viewModel.cameraMode.value == CameraMode.VIDEO
+                        && viewModel.isShutterButtonEnabled.value
+                        && event?.repeatCount == 0
+                    ) {
+                        shutterButton.performClick()
+                    }
                     true
                 }
-            }
 
-            GestureAction.NOTHING -> {
-                // Do nothing
-                true
+                GestureAction.FOCUS -> {
+                    if (event?.repeatCount == 0) {
+                        viewFinderTouchEvent = null
+                        viewFinder.performClick()
+                    }
+                    true
+                }
+
+                GestureAction.MIC_MUTE -> {
+                    if (viewModel.cameraMode.value == CameraMode.VIDEO && micButton.isEnabled &&
+                        event?.repeatCount == 0
+                    ) {
+                        viewModel.toggleVideoMicrophoneEnabled()
+                    }
+                    true
+                }
+
+                GestureAction.ZOOM -> {
+                    when (increase) {
+                        true -> viewModel.zoomIn()
+                        false -> viewModel.zoomOut()
+                    }
+                    true
+                }
+
+                GestureAction.DEFAULT -> {
+                    if (hardwareKey.supportsDefault) {
+                        super.onKeyDown(keyCode, event)
+                    } else {
+                        Log.wtf(
+                            LOG_TAG,
+                            "Got GestureAction.DEFAULT for ${hardwareKey.name} which doesn't support it"
+                        )
+                        true
+                    }
+                }
+
+                GestureAction.NOTHING -> {
+                    // Do nothing
+                    true
+                }
             }
         }
     }
 
     private fun handleHardwareKeyUp(
         keyCode: Int, event: KeyEvent?
-    ) = HardwareKey.match(keyCode)?.let { (hardwareKey, _) ->
-        val gestureAction = viewModel.getHardwareKeyAction(hardwareKey)
-
-        if (gestureAction.isTwoWayAction && !hardwareKey.isTwoWayKey) {
-            Log.wtf(
-                LOG_TAG,
-                "${gestureAction.name} requires two-way key but ${hardwareKey.name} is not"
-            )
-            return@let true
+    ): Boolean? {
+        if (keyCode == KeyEvent.KEYCODE_SPACE || keyCode == KeyEvent.KEYCODE_ENTER || keyCode == KeyEvent.KEYCODE_NUMPAD_ENTER || keyCode == KeyEvent.KEYCODE_DPAD_CENTER) {
+            if (viewModel.cameraMode.value != CameraMode.QR
+                && viewModel.isShutterButtonEnabled.value
+            ) {
+                shutterButton.performClick()
+            }
+            return true
         }
 
-        when (gestureAction) {
-            GestureAction.SHUTTER -> {
-                if (viewModel.cameraMode.value != CameraMode.QR
-                    && viewModel.isShutterButtonEnabled.value
-                ) {
-                    shutterButton.performClick()
-                }
-                true
+        return HardwareKey.match(keyCode)?.let { (hardwareKey, _) ->
+            val gestureAction = viewModel.getHardwareKeyAction(hardwareKey)
+
+            if (gestureAction.isTwoWayAction && !hardwareKey.isTwoWayKey) {
+                Log.wtf(
+                    LOG_TAG,
+                    "${gestureAction.name} requires two-way key but ${hardwareKey.name} is not"
+                )
+                return@let true
             }
 
-            GestureAction.FOCUS -> {
-                true
-            }
-
-            GestureAction.MIC_MUTE -> {
-                true
-            }
-
-            GestureAction.ZOOM -> {
-                true
-            }
-
-            GestureAction.DEFAULT -> {
-                if (hardwareKey.supportsDefault) {
-                    super.onKeyDown(keyCode, event)
-                } else {
-                    Log.wtf(
-                        LOG_TAG,
-                        "Got GestureAction.DEFAULT for ${hardwareKey.name} which doesn't support it"
-                    )
+            when (gestureAction) {
+                GestureAction.SHUTTER -> {
+                    if (viewModel.cameraMode.value != CameraMode.QR
+                        && viewModel.isShutterButtonEnabled.value
+                    ) {
+                        shutterButton.performClick()
+                    }
                     true
                 }
-            }
 
-            GestureAction.NOTHING -> {
-                // Do nothing
-                true
+                GestureAction.FOCUS -> {
+                    true
+                }
+
+                GestureAction.MIC_MUTE -> {
+                    true
+                }
+
+                GestureAction.ZOOM -> {
+                    true
+                }
+
+                GestureAction.DEFAULT -> {
+                    if (hardwareKey.supportsDefault) {
+                        super.onKeyDown(keyCode, event)
+                    } else {
+                        Log.wtf(
+                            LOG_TAG,
+                            "Got GestureAction.DEFAULT for ${hardwareKey.name} which doesn't support it"
+                        )
+                        true
+                    }
+                }
+
+                GestureAction.NOTHING -> {
+                    // Do nothing
+                    true
+                }
             }
         }
     }

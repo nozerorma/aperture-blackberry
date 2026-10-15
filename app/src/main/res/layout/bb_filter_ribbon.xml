@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+     SPDX-FileCopyrightText: The LineageOS Project
+     SPDX-License-Identifier: Apache-2.0
+-->
+<HorizontalScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/bbFilterRibbonContainer"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="#D9121212"
+    android:clipToPadding="false"
+    android:paddingVertical="8dp"
+    android:paddingHorizontal="8dp"
+    android:scrollbars="none"
+    android:visibility="gone">
+
+    <LinearLayout
+        android:id="@+id/bbFilterItemList"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal" />
+
+</HorizontalScrollView>

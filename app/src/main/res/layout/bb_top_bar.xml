@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+     SPDX-FileCopyrightText: The LineageOS Project
+     SPDX-License-Identifier: Apache-2.0
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/bbTopBarContainer"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical">
+
+    <LinearLayout
+        android:id="@+id/bbTopBar"
+        android:layout_width="match_parent"
+        android:layout_height="52dp"
+        android:background="@drawable/bb_top_bar_gradient"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingHorizontal="12dp"
+        android:paddingTop="2dp"
+        android:paddingBottom="2dp">
+
+        <ImageButton
+            android:id="@+id/btnBbFlash"
+            android:layout_width="0dp"
+            android:layout_height="48dp"
+            android:layout_weight="1"
+            android:padding="12dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/flash_button_description"
+            android:scaleType="centerInside"
+            android:src="@drawable/ic_flash_auto_white_24dp" />
+
+        <ImageButton
+            android:id="@+id/btnBbTimer"
+            android:layout_width="0dp"
+            android:layout_height="48dp"
+            android:layout_weight="1"
+            android:padding="12dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/timer_off"
+            android:scaleType="centerInside"
+            android:src="@drawable/ic_timer_off_white_24dp" />
+
+        <ImageButton
+            android:id="@+id/btnBbAspectRatio"
+            android:layout_width="0dp"
+            android:layout_height="48dp"
+            android:layout_weight="1"
+            android:padding="12dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/aspect_ratio_4_3"
+            android:scaleType="centerInside"
+            android:src="@drawable/ic_ratio_4_3_white_24dp" />
+
+        <ImageButton
+            android:id="@+id/btnBbHdr"
+            android:layout_width="0dp"
+            android:layout_height="48dp"
+            android:layout_weight="1"
+            android:padding="12dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/effect_hdr"
+            android:scaleType="centerInside"
+            android:src="@drawable/ic_hdr_auto_white_24dp" />
+
+        <ImageButton
+            android:id="@+id/btnBbSettings"
+            android:layout_width="0dp"
+            android:layout_height="48dp"
+            android:layout_weight="1"
+            android:padding="12dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/settings"
+            android:scaleType="centerInside"
+            android:src="@drawable/ic_settings_white_24dp" />
+
+    </LinearLayout>
+
+    <!-- Submenu strip that drops down when tapping any top bar item -->
+    <LinearLayout
+        android:id="@+id/llBbSubmenu"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="#E6141414"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:paddingVertical="8dp"
+        android:visibility="gone" />
+
+</LinearLayout>

@@ -184,4 +184,46 @@
     <string name="video_mirror_mode_off">Desactivado</string>
     <string name="video_mirror_mode_on">Encendido</string>
     <string name="video_mirror_mode_on_ffc_only">Solo cámara frontal</string>
+
+    <!-- BlackBerry UI strings -->
+    <string name="bb_mode_photo">Foto</string>
+    <string name="bb_mode_video">Vídeo</string>
+    <string name="bb_mode_pro">Pro</string>
+    <string name="bb_mode_portrait">Retrato</string>
+    <string name="bb_mode_pano">Pano</string>
+    <string name="bb_mode_scanner">Escáner</string>
+    <string name="bb_resolution_header">RESOLUCIÓN (%1$s)</string>
+    <string name="bb_capture_mode_header">MODO DE DISPARO</string>
+    <string name="bb_min_latency">Mín. latencia</string>
+    <string name="bb_max_quality">Máx. calidad</string>
+    <string name="bb_zsl_enabled">ZSL: Activado</string>
+    <string name="bb_zsl_disabled">ZSL: Desactivado</string>
+    <string name="bb_toast_min_latency">Mínima latencia activada</string>
+    <string name="bb_toast_max_quality">Máxima calidad activada</string>
+    <string name="bb_toast_zsl_on">Zero Shutter Lag (ZSL) activado</string>
+    <string name="bb_toast_zsl_off">Zero Shutter Lag (ZSL) desactivado</string>
+    <string name="bb_toast_portrait">Modo Retrato activado</string>
+    <string name="bb_toast_pano">Panorámica: Mantén el dispositivo nivelado</string>
+    <string name="bb_toast_scanner">Escáner de documentos y códigos</string>
+    <string name="bb_toast_hdr_on">HDR activado</string>
+    <string name="bb_toast_hdr_off">HDR desactivado</string>
+    <string name="bb_filter_none">Ninguno</string>
+    <string name="bb_filter_saturate">Vívido</string>
+    <string name="bb_filter_freshen">Calma</string>
+    <string name="bb_filter_freeze">Atenas</string>
+    <string name="bb_filter_sepia">La Habana</string>
+    <string name="bb_filter_stark">Impacto</string>
+    <string name="bb_filter_agapantha">Nessa</string>
+    <string name="bb_filter_clifton">Vande</string>
+    <string name="bb_filter_bw093">Niebla</string>
+    <string name="bb_filter_ilford">Ilford</string>
+    <string name="bb_filter_portra160">Portra</string>
+    <string name="bb_filter_rouge">Rouge</string>
+    <string name="bb_filter_vignette">Viñeta</string>
+    <string name="bb_filter_px70">PX70</string>
+    <string name="bb_filter_negative">Negativo</string>
+    <string name="bb_filter_desaturate">Desaturado</string>
+    <string name="bb_filter_gild">Gild</string>
+    <string name="bb_filter_infrared">Infrarrojo</string>
+    <string name="bb_filter_protea">Protea</string>
 </resources>

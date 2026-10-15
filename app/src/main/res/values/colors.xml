@@ -9,4 +9,9 @@
     <color name="dark_grey">#FF444444</color>
     <color name="yellow">#E9B650</color>
     <color name="rec_red">#FFE95950</color>
+    <color name="image_capture_white">#FFFFFFFF</color>
+    <color name="capture_button_text_shadow_color">#1a000000</color>
+    <color name="bb_bar_gradient_start">#B3000000</color>
+    <color name="bb_bar_gradient_end">#00000000</color>
+    <color name="bb_deck_background">#E6121212</color>
 </resources>

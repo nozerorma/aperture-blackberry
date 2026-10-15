@@ -18,7 +18,8 @@
         android:layout_width="0dp"
         android:layout_height="0dp"
         android:soundEffectsEnabled="false"
-        app:layout_constraintBottom_toTopOf="@+id/secondaryBottomBarLayout"
+        app:implementationMode="compatible"
+        app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent"
@@ -87,23 +88,28 @@
         app:layout_constraintStart_toStartOf="@+id/viewFinder"
         app:layout_constraintTop_toTopOf="@+id/viewFinder" />
 
-    <org.lineageos.aperture.ui.views.HorizontalSlider
+    <org.lineageos.aperture.ui.views.VerticalSlider
         android:id="@+id/zoomLevel"
-        android:layout_width="250dp"
-        android:layout_height="32dp"
+        android:layout_width="44dp"
+        android:layout_height="220dp"
+        android:layout_marginStart="8dp"
         android:visibility="gone"
         app:layout_constraintBottom_toBottomOf="@+id/viewFinder"
-        app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="@+id/viewFinder"
         app:thumbColor="@android:color/white"
         app:thumbTextColor="@android:color/black"
         app:thumbTextSize="10dp"
-        app:trackColor="#7FCCCCCC" />
+        app:trackBorderColor="#a9a7aa"
+        app:trackColorGradient="true"
+        app:trackColorGradientCenter="#636363"
+        app:trackColorGradientEnd="#242424"
+        app:trackColorGradientStart="#8d9299" />
 
     <org.lineageos.aperture.ui.views.VerticalSlider
         android:id="@+id/exposureLevel"
-        android:layout_width="32dp"
-        android:layout_height="250dp"
+        android:layout_width="44dp"
+        android:layout_height="220dp"
         android:layout_marginEnd="8dp"
         android:visibility="gone"
         app:layout_constraintBottom_toBottomOf="@+id/viewFinder"
@@ -126,7 +132,7 @@
         android:fillViewport="true"
         android:scrollbars="none"
         android:visibility="gone"
-        app:layout_constraintBottom_toTopOf="@+id/secondaryBottomBarLayout"
+        app:layout_constraintBottom_toTopOf="@+id/bbBottomDeckLayout"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent">
 
@@ -207,11 +213,13 @@
 
     </HorizontalScrollView>
 
+    <!-- Old secondary bottom bar (hidden) -->
     <androidx.constraintlayout.widget.ConstraintLayout
         android:id="@+id/secondaryBottomBarLayout"
         android:layout_width="0dp"
         android:layout_height="72dp"
-        app:layout_constraintBottom_toTopOf="@+id/primaryBarLayout"
+        android:visibility="gone"
+        app:layout_constraintBottom_toTopOf="@+id/bbBottomDeckLayout"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent">
 
@@ -241,125 +249,162 @@
             android:src="@drawable/ic_google_lens"
             android:visibility="gone"
             app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent"
             app:tint="@android:color/white" />
 
-        <org.lineageos.aperture.ui.views.LensSelectorLayout
-            android:id="@+id/lensSelectorLayout"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toTopOf="parent" />
-
         <ImageButton
             android:id="@+id/flashButton"
-            style="@style/Theme.Aperture.Camera.SecondaryBottomBarButton"
-            android:layout_marginEnd="40dp"
-            android:contentDescription="@string/flash_button_description"
-            app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintTop_toTopOf="parent"
-            app:srcCompat="@drawable/ic_flash_off" />
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
     </androidx.constraintlayout.widget.ConstraintLayout>
 
-    <androidx.constraintlayout.widget.ConstraintLayout
-        android:id="@+id/primaryBarLayout"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:paddingTop="16dp"
-        app:layout_constraintBottom_toTopOf="@+id/cameraModeSelectorLayout"
+    <!-- Scanner Mode Framing Reticle -->
+    <FrameLayout
+        android:id="@+id/scannerReticleLayout"
+        android:layout_width="220dp"
+        android:layout_height="220dp"
+        android:visibility="gone"
+        app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent">
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent">
 
-        <ImageButton
-            android:id="@+id/shutterButton"
-            android:layout_width="75dp"
-            android:layout_height="75dp"
-            android:background="@null"
-            android:contentDescription="@string/shutter_button_description"
-            android:soundEffectsEnabled="false"
-            android:src="@drawable/avd_photo_capture"
-            app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintLeft_toLeftOf="parent"
-            app:layout_constraintRight_toRightOf="parent"
-            app:layout_constraintTop_toTopOf="parent" />
+        <ImageView
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:src="@drawable/scanner_bracket_overlay" />
 
-        <androidx.cardview.widget.CardView
-            android:id="@+id/galleryButtonCardView"
-            android:layout_width="60dp"
-            android:layout_height="60dp"
-            android:layout_gravity="center"
-            android:layout_marginStart="32dp"
-            android:backgroundTint="?colorSecondaryContainer"
-            android:scaleType="fitXY"
-            app:cardCornerRadius="8dp"
-            app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toTopOf="parent">
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom|center_horizontal"
+            android:layout_marginBottom="12dp"
+            android:background="#80000000"
+            android:paddingHorizontal="10dp"
+            android:paddingVertical="4dp"
+            android:text="Escanejar codi o document"
+            android:textColor="@android:color/white"
+            android:textSize="11sp" />
+    </FrameLayout>
 
-            <FrameLayout
-                android:layout_width="match_parent"
-                android:layout_height="match_parent">
+    <!-- Panorama Mode Guide -->
+    <LinearLayout
+        android:id="@+id/panoramaGuideLayout"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:visibility="gone"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintTop_toTopOf="parent">
 
-                <ImageView
-                    android:id="@+id/galleryButtonIconImageView"
-                    android:layout_width="match_parent"
-                    android:layout_height="match_parent"
-                    android:contentDescription="@string/gallery_button_description"
-                    android:scaleX="0.50"
-                    android:scaleY="0.50"
-                    app:tint="?attr/colorOnSecondaryContainer" />
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:background="#80000000"
+            android:paddingHorizontal="14dp"
+            android:paddingVertical="6dp"
+            android:text="◀ ─── PANORÀMICA ─── ▶"
+            android:textColor="@android:color/white"
+            android:textSize="12sp"
+            android:textStyle="bold" />
+    </LinearLayout>
 
-                <ImageView
-                    android:id="@+id/galleryButtonPreviewImageView"
-                    android:layout_width="match_parent"
-                    android:layout_height="match_parent"
-                    android:contentDescription="@string/gallery_button_description"
-                    android:scaleType="centerCrop"
-                    android:visibility="gone" />
+    <!-- Portrait Mode Badge -->
+    <LinearLayout
+        android:id="@+id/portraitGuideLayout"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="80dp"
+        android:background="#80000000"
+        android:orientation="horizontal"
+        android:paddingHorizontal="14dp"
+        android:paddingVertical="4dp"
+        android:visibility="gone"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent">
 
-            </FrameLayout>
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="EFECTE RETRAT"
+            android:textColor="@android:color/white"
+            android:textSize="11sp"
+            android:textStyle="bold" />
+    </LinearLayout>
 
-        </androidx.cardview.widget.CardView>
-
-        <ImageButton
-            android:id="@+id/flipCameraButton"
-            android:layout_width="60dp"
-            android:layout_height="60dp"
-            android:layout_marginEnd="32dp"
-            android:background="@null"
-            android:contentDescription="@string/flip_camera_button_description"
-            android:scaleType="center"
-            android:src="@drawable/ic_flip_camera"
-            app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintTop_toTopOf="parent" />
-
-        <ImageButton
-            android:id="@+id/videoRecordingStateButton"
-            android:layout_width="32dp"
-            android:layout_height="32dp"
-            android:background="@null"
-            android:contentDescription="@string/video_recording_state_button_description"
-            android:src="@drawable/avd_video_recording_pause"
-            android:visibility="gone"
-            app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintEnd_toEndOf="@+id/flipCameraButton"
-            app:layout_constraintStart_toStartOf="@+id/flipCameraButton"
-            app:layout_constraintTop_toTopOf="parent" />
-    </androidx.constraintlayout.widget.ConstraintLayout>
-
+    <!-- Hidden dummy cameraModeSelectorLayout for compatibility -->
     <org.lineageos.aperture.ui.views.CameraModeSelectorLayout
         android:id="@+id/cameraModeSelectorLayout"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:visibility="gone"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent" />
+
+    <!-- BlackBerry Mode Grid Popup -->
+    <include
+        android:id="@+id/bbModeGridLayout"
+        layout="@layout/bb_mode_grid"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        app:layout_constraintBottom_toTopOf="@+id/bbBottomDeckLayout"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent" />
+
+    <!-- BlackBerry Live Filter Ribbon -->
+    <include
+        android:id="@+id/bbFilterRibbonLayout"
+        layout="@layout/bb_filter_ribbon"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        app:layout_constraintBottom_toTopOf="@+id/bbBottomDeckLayout"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent" />
+
+    <!-- BlackBerry Pro Mode Controls (EV Dial & Manual Sliders) -->
+    <include
+        android:id="@+id/bbProControlsLayout"
+        layout="@layout/bb_pro_controls"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        app:layout_constraintBottom_toTopOf="@+id/bbBottomDeckLayout"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent" />
+
+    <!-- Aperture Material 3 Lens / Zoom Pill Selector (Centered right above bottom deck) -->
+    <org.lineageos.aperture.ui.views.LensSelectorLayout
+        android:id="@+id/lensSelectorLayout"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="12dp"
+        android:orientation="horizontal"
+        app:layout_constraintBottom_toTopOf="@+id/bbBottomDeckLayout"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent" />
+
+    <!-- BlackBerry Bottom Deck (Shutter, Gallery, Mode, Flip, Filter) -->
+    <include
+        android:id="@+id/bbBottomDeckLayout"
+        layout="@layout/bb_bottom_deck"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent" />
+
+    <!-- BlackBerry Top Bar (Flash, Timer, Aspect Ratio, HDR, Settings) -->
+    <include
+        android:id="@+id/bbTopBarLayout"
+        layout="@layout/bb_top_bar"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
 
     <androidx.camera.view.ScreenFlashView
         android:id="@+id/screenFlashView"

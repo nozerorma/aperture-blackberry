@@ -184,4 +184,46 @@
     <string name="video_mirror_mode_off">Desactivat</string>
     <string name="video_mirror_mode_on">Activat</string>
     <string name="video_mirror_mode_on_ffc_only">Només la càmera frontal</string>
+
+    <!-- BlackBerry UI strings -->
+    <string name="bb_mode_photo">Foto</string>
+    <string name="bb_mode_video">Vídeo</string>
+    <string name="bb_mode_pro">Pro</string>
+    <string name="bb_mode_portrait">Retrat</string>
+    <string name="bb_mode_pano">Pano</string>
+    <string name="bb_mode_scanner">Escàner</string>
+    <string name="bb_resolution_header">RESOLUCIÓ (%1$s)</string>
+    <string name="bb_capture_mode_header">MODALITAT DE DISPAR</string>
+    <string name="bb_min_latency">Mín. latència</string>
+    <string name="bb_max_quality">Màx. qualitat</string>
+    <string name="bb_zsl_enabled">ZSL: Activat</string>
+    <string name="bb_zsl_disabled">ZSL: Desactivat</string>
+    <string name="bb_toast_min_latency">Mínima latència activada</string>
+    <string name="bb_toast_max_quality">Màxima qualitat activada</string>
+    <string name="bb_toast_zsl_on">Zero Shutter Lag (ZSL) activat</string>
+    <string name="bb_toast_zsl_off">Zero Shutter Lag (ZSL) desactivat</string>
+    <string name="bb_toast_portrait">Mode Retrat activat</string>
+    <string name="bb_toast_pano">Panoràmica: Mantingues el dispositiu anivellat</string>
+    <string name="bb_toast_scanner">Escàner de documents i codis</string>
+    <string name="bb_toast_hdr_on">HDR activat</string>
+    <string name="bb_toast_hdr_off">HDR desactivat</string>
+    <string name="bb_filter_none">Cap</string>
+    <string name="bb_filter_saturate">Viu</string>
+    <string name="bb_filter_freshen">Calma</string>
+    <string name="bb_filter_freeze">Atena</string>
+    <string name="bb_filter_sepia">Havana</string>
+    <string name="bb_filter_stark">Impacte</string>
+    <string name="bb_filter_agapantha">Nessa</string>
+    <string name="bb_filter_clifton">Vande</string>
+    <string name="bb_filter_bw093">Boira</string>
+    <string name="bb_filter_ilford">Ilford</string>
+    <string name="bb_filter_portra160">Portra</string>
+    <string name="bb_filter_rouge">Rouge</string>
+    <string name="bb_filter_vignette">Vinyeta</string>
+    <string name="bb_filter_px70">PX70</string>
+    <string name="bb_filter_negative">Negatiu</string>
+    <string name="bb_filter_desaturate">Desaturat</string>
+    <string name="bb_filter_gild">Gild</string>
+    <string name="bb_filter_infrared">Infraroig</string>
+    <string name="bb_filter_protea">Protea</string>
 </resources>

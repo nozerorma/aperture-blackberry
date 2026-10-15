@@ -11,35 +11,35 @@
 
         <SwitchPreference
             app:defaultValue="false"
-            app:iconSpaceReserved="false"
+            app:icon="@drawable/ic_brightness_high"
             app:key="bright_screen"
             app:summary="@string/bright_screen_summary"
             app:title="@string/bright_screen_title" />
 
         <SwitchPreference
             app:defaultValue="false"
-            app:iconSpaceReserved="false"
+            app:icon="@drawable/ic_location_on"
             app:key="save_location"
             app:summary="@string/save_location_summary"
             app:title="@string/save_location_title" />
 
         <SwitchPreference
             app:defaultValue="true"
-            app:iconSpaceReserved="false"
+            app:icon="@drawable/ic_volume_up"
             app:key="shutter_sound"
             app:summary="@string/shutter_sound_summary"
             app:title="@string/shutter_sound_title" />
 
         <SwitchPreference
             app:defaultValue="false"
-            app:iconSpaceReserved="false"
+            app:icon="@drawable/ic_screen_rotation"
             app:key="leveler"
             app:summary="@string/leveler_summary"
             app:title="@string/leveler_title" />
 
         <Preference
             app:fragment="org.lineageos.aperture.SettingsActivity$GesturesSettingsFragment"
-            app:iconSpaceReserved="false"
+            app:icon="@drawable/ic_touch_app"
             app:title="@string/gestures_title" />
 
     </PreferenceCategory>
@@ -52,28 +52,28 @@
             app:defaultValue="minimize_latency"
             app:entries="@array/photo_capture_mode_entries"
             app:entryValues="@array/photo_capture_mode_values"
-            app:iconSpaceReserved="false"
+            app:icon="@drawable/ic_image"
             app:key="photo_capture_mode"
             app:title="@string/photo_capture_mode_title"
             app:useSimpleSummaryProvider="true" />
 
         <SwitchPreference
             app:defaultValue="false"
-            app:iconSpaceReserved="false"
+            app:icon="@drawable/ic_shutter_base"
             app:key="enable_zsl"
             app:summary="@string/enable_zsl_summary"
             app:title="@string/enable_zsl_title" />
 
         <SwitchPreference
             app:defaultValue="true"
-            app:iconSpaceReserved="false"
+            app:icon="@drawable/ic_hdr_on"
             app:key="use_photo_jpeg_ultra_hdr"
             app:summary="@string/use_photo_jpeg_ultra_hdr_summary"
             app:title="@string/use_photo_jpeg_ultra_hdr_title" />
 
         <SwitchPreference
             app:defaultValue="false"
-            app:iconSpaceReserved="false"
+            app:icon="@drawable/ic_raw_on"
             app:key="enable_raw_image_capture"
             app:summary="@string/enable_raw_image_capture_summary"
             app:title="@string/enable_raw_image_capture_title" />
@@ -81,14 +81,14 @@
         <SwitchPreference
             app:defaultValue="false"
             app:dependency="enable_raw_image_capture"
-            app:iconSpaceReserved="false"
+            app:icon="@drawable/ic_broken_image"
             app:key="disable_jpeg_with_raw"
             app:summary="@string/disable_jpeg_with_raw_summary"
             app:title="@string/disable_jpeg_with_raw_title" />
 
         <SwitchPreference
             app:defaultValue="true"
-            app:iconSpaceReserved="false"
+            app:icon="@drawable/ic_flip_camera"
             app:key="photo_ffc_mirror"
             app:summary="@string/photo_ffc_mirror_summary"
             app:title="@string/photo_ffc_mirror_title" />
@@ -101,7 +101,7 @@
 
         <SwitchPreference
             app:defaultValue="true"
-            app:iconSpaceReserved="false"
+            app:icon="@drawable/ic_video_frame_rate"
             app:key="video_stabilization"
             app:summary="@string/video_stabilization_summary"
             app:title="@string/video_stabilization_title" />
@@ -110,7 +110,7 @@
             app:defaultValue="off"
             app:entries="@array/video_mirror_mode_entries"
             app:entryValues="@array/video_mirror_mode_values"
-            app:iconSpaceReserved="false"
+            app:icon="@drawable/ic_flip_camera"
             app:key="video_mirror_mode"
             app:title="@string/video_mirror_mode_title"
             app:useSimpleSummaryProvider="true" />
@@ -123,7 +123,7 @@
 
         <Preference
             app:fragment="org.lineageos.aperture.SettingsActivity$ProcessingSettingsFragment"
-            app:iconSpaceReserved="false"
+            app:icon="@drawable/ic_tune"
             app:title="@string/processing_title" />
 
     </PreferenceCategory>
