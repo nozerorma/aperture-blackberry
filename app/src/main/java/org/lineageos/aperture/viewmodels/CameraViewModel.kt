@@ -190,6 +190,9 @@ class CameraViewModel(application: Application) : ApertureViewModel(application)
             replay = 1,
         )
 
+    val currentCamera: Camera?
+        get() = _cameraConfiguration.value?.camera
+
     /**
      * The current camera.
      */

@@ -50,6 +50,7 @@ import android.graphics.RenderEffect
 import android.graphics.Typeface
 import android.util.Size
 import android.view.Gravity
+import java.util.Locale
 import com.google.android.material.card.MaterialCardView
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
@@ -261,30 +262,80 @@ open class CameraActivity : AppCompatActivity(R.layout.activity_camera) {
         val mp: String
     )
 
-    private val resolutions4_3 = listOf(
-        ResolutionOption("50 MP", Size(8160, 6144), "8160×6144"),
-        ResolutionOption("12 MP", Size(4032, 3024), "4032×3024"),
-        ResolutionOption("8 MP", Size(3264, 2448), "3264×2448"),
-        ResolutionOption("5 MP", Size(2560, 1920), "2560×1920"),
-    )
+    private fun getAvailableResolutions(ratio: Int, isSquare: Boolean, is3_2: Boolean): List<ResolutionOption> {
+        val currentCamera = viewModel.currentCamera
+        val allSizes = currentCamera?.supportedPhotoResolutions.orEmpty()
+        if (allSizes.isEmpty()) {
+            return when {
+                isSquare -> listOf(
+                    ResolutionOption("8.9 MP", Size(2976, 2976), "2976×2976"),
+                    ResolutionOption("0.5 MP", Size(720, 720), "720×720")
+                )
+                is3_2 -> listOf(
+                    ResolutionOption("11 MP", Size(3996, 2664), "3996×2664")
+                )
+                ratio == AspectRatio.RATIO_16_9 -> listOf(
+                    ResolutionOption("8.3 MP (4K)", Size(3840, 2160), "3840×2160"),
+                    ResolutionOption("2.1 MP (1080p)", Size(1920, 1080), "1920×1080")
+                )
+                else -> listOf(
+                    ResolutionOption("12 MP", Size(4032, 3024), "4032×3024"),
+                    ResolutionOption("8 MP", Size(3264, 2448), "3264×2448"),
+                    ResolutionOption("5 MP", Size(2560, 1920), "2560×1920")
+                )
+            }
+        }
 
-    private val resolutions16_9 = listOf(
-        ResolutionOption("9.4 MP", Size(4096, 2304), "4096×2304"),
-        ResolutionOption("8.3 MP (4K)", Size(3840, 2160), "3840×2160"),
-        ResolutionOption("2.1 MP (1080p)", Size(1920, 1080), "1920×1080"),
-    )
+        if (isSquare) {
+            val nativeSquares = allSizes.filter { it.width == it.height }
+            if (nativeSquares.isNotEmpty()) {
+                return nativeSquares.take(4).map { size ->
+                    val mp = (size.width.toLong() * size.height.toLong()).toFloat() / 1_000_000f
+                    val label = if (mp >= 10f) String.format(Locale.US, "%.0f MP", mp) else String.format(Locale.US, "%.1f MP", mp)
+                    ResolutionOption(label, size, "${size.width}×${size.height}")
+                }
+            } else {
+                val sizes4_3 = allSizes.filter {
+                    val w = maxOf(it.width, it.height).toFloat()
+                    val h = minOf(it.width, it.height).toFloat()
+                    Math.abs((w / h) - (4f / 3f)) < 0.05f
+                }
+                return sizes4_3.take(4).map { size ->
+                    val dim = minOf(size.width, size.height)
+                    val squareSize = Size(dim, dim)
+                    val mp = (dim.toLong() * dim.toLong()).toFloat() / 1_000_000f
+                    val label = if (mp >= 10f) String.format(Locale.US, "%.0f MP", mp) else String.format(Locale.US, "%.1f MP", mp)
+                    ResolutionOption(label, squareSize, "${dim}×${dim}")
+                }
+            }
+        }
 
-    private val resolutions1_1 = listOf(
-        ResolutionOption("37 MP", Size(6144, 6144), "6144×6144"),
-        ResolutionOption("9.1 MP", Size(3024, 3024), "3024×3024"),
-        ResolutionOption("6 MP", Size(2448, 2448), "2448×2448"),
-        ResolutionOption("0.5 MP", Size(720, 720), "720×720"),
-    )
+        val targetAspect = when {
+            is3_2 -> 3.0f / 2.0f
+            ratio == AspectRatio.RATIO_16_9 -> 16.0f / 9.0f
+            else -> 4.0f / 3.0f
+        }
 
-    private val resolutions3_2 = listOf(
-        ResolutionOption("11 MP", Size(4032, 2688), "4032×2688"),
-        ResolutionOption("7 MP", Size(3264, 2176), "3264×2176"),
-    )
+        val filtered = allSizes.filter {
+            val w = maxOf(it.width, it.height).toFloat()
+            val h = minOf(it.width, it.height).toFloat()
+            Math.abs((w / h) - targetAspect) < 0.05f
+        }
+
+        val candidates = if (filtered.isNotEmpty()) filtered.take(4) else allSizes.take(3)
+        return candidates.map { size ->
+            val w = maxOf(size.width, size.height)
+            val h = minOf(size.width, size.height)
+            val mp = (w.toLong() * h.toLong()).toFloat() / 1_000_000f
+            val label = when {
+                ratio == AspectRatio.RATIO_16_9 && w == 3840 && h == 2160 -> "8.3 MP (4K)"
+                ratio == AspectRatio.RATIO_16_9 && w == 1920 && h == 1080 -> "2.1 MP (1080p)"
+                mp >= 10f -> String.format(Locale.US, "%.0f MP", mp)
+                else -> String.format(Locale.US, "%.1f MP", mp)
+            }
+            ResolutionOption(label, Size(w, h), "${w}×${h}")
+        }
+    }
 
     private var currentTargetResolution: Size? = null
     private var currentResolutionLabel: String = "12 MP"
@@ -2076,13 +2127,8 @@ open class CameraActivity : AppCompatActivity(R.layout.activity_camera) {
                     btnBbAspectRatio.setImageResource(opt.iconRes)
 
                     // Ensure target resolution matches this format
-                    val resList = when {
-                        isSquareMode -> resolutions1_1
-                        is3_2Mode -> resolutions3_2
-                        currentSelectedRatio == AspectRatio.RATIO_16_9 -> resolutions16_9
-                        else -> resolutions4_3
-                    }
-                    val def = resList.getOrNull(1) ?: resList.first()
+                    val resList = getAvailableResolutions(opt.ratio, opt.isSquare, opt.is3_2)
+                    val def = resList.find { it.size == currentTargetResolution } ?: resList.getOrNull(0) ?: resList.first()
                     currentTargetResolution = def.size
                     currentResolutionLabel = def.label
 
@@ -2099,6 +2145,16 @@ open class CameraActivity : AppCompatActivity(R.layout.activity_camera) {
         llBbSubmenu.addView(ratioRow)
 
         // 2. Divider / Header
+        // 2. Resolutions row
+        val resList = getAvailableResolutions(currentSelectedRatio, isSquareMode, is3_2Mode)
+        if (currentTargetResolution == null || resList.none { it.size == currentTargetResolution }) {
+            resList.firstOrNull()?.let {
+                currentTargetResolution = it.size
+                currentResolutionLabel = it.label
+            }
+        }
+
+        // Header
         val header = TextView(this).apply {
             layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
                 setMargins(0, 6.px, 0, 4.px)
@@ -2109,14 +2165,6 @@ open class CameraActivity : AppCompatActivity(R.layout.activity_camera) {
             typeface = Typeface.DEFAULT_BOLD
         }
         llBbSubmenu.addView(header)
-
-        // 3. Resolutions row
-        val resList = when {
-            isSquareMode -> resolutions1_1
-            is3_2Mode -> resolutions3_2
-            currentSelectedRatio == AspectRatio.RATIO_16_9 -> resolutions16_9
-            else -> resolutions4_3
-        }
 
         val scroll = HorizontalScrollView(this).apply {
             layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)

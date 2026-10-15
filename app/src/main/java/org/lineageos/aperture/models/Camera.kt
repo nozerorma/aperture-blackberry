@@ -5,9 +5,11 @@
 
 package org.lineageos.aperture.models
 
+import android.graphics.ImageFormat
 import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraMetadata
 import android.os.Build
+import android.util.Size
 import androidx.annotation.OptIn
 import androidx.camera.camera2.interop.Camera2CameraInfo
 import androidx.camera.camera2.interop.ExperimentalCamera2Interop
@@ -82,6 +84,19 @@ class Camera private constructor(
             ImageCapture.OUTPUT_FORMAT_RAW_JPEG -> PhotoOutputFormat.RAW_JPEG
             else -> error("Unknown CameraX output format $it")
         }
+    }
+
+    val supportedPhotoResolutions: List<Size> = run {
+        val map = camera2CameraInfo.getCameraCharacteristic(
+            CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP
+        )
+        val normalSizes = map?.getOutputSizes(ImageFormat.JPEG)?.toList().orEmpty()
+        val highResSizes = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            map?.getHighResolutionOutputSizes(ImageFormat.JPEG)?.toList().orEmpty()
+        } else {
+            emptyList()
+        }
+        (normalSizes + highResSizes).distinct().sortedByDescending { it.width.toLong() * it.height.toLong() }
     }
 
     private val supportedVideoFrameRates = cameraInfo.supportedFrameRateRanges.mapNotNull {
