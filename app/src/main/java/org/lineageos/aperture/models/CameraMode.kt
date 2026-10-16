@@ -19,12 +19,14 @@ enum class CameraMode(
     VIDEO(
         setOf(
             FlashMode.OFF,
+            FlashMode.ON,
             FlashMode.TORCH,
         ),
     ),
     QR(
         setOf(
             FlashMode.OFF,
+            FlashMode.ON,
             FlashMode.TORCH,
         ),
     ),
