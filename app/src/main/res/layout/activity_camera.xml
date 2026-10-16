@@ -302,7 +302,7 @@
 
     <!-- Live QR Chip floating banner -->
     <include
-        android:id="@+id/bbLiveQrChipLayout"
+        android:id="@+id/bbLiveQrChipContainer"
         layout="@layout/bb_live_qr_chip"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"

@@ -465,7 +465,9 @@ open class CameraActivity : AppCompatActivity(R.layout.activity_camera) {
             }
         }
     }
-    private val liveQrChipContainer by lazy { findViewById<View>(R.id.bbLiveQrChipContainer) }
+    private val liveQrChipContainer by lazy {
+        findViewById<View>(R.id.bbLiveQrChipContainer)
+    }
     private val cardQrChip by lazy { findViewById<View>(R.id.cardQrChip) }
     private val tvQrChipTitle by lazy { findViewById<TextView>(R.id.tvQrChipTitle) }
     private val tvQrChipSubtitle by lazy { findViewById<TextView>(R.id.tvQrChipSubtitle) }
@@ -474,8 +476,12 @@ open class CameraActivity : AppCompatActivity(R.layout.activity_camera) {
     private var currentLiveQrResult: QrResult? = null
 
     private fun updateLiveQrChip(qrResult: QrResult?) {
-        val chipView = liveQrChipContainer ?: return
+        val chipView = liveQrChipContainer ?: run {
+            Log.w(LOG_TAG, "updateLiveQrChip: liveQrChipContainer is null!")
+            return
+        }
         currentLiveQrResult = qrResult
+        Log.d(LOG_TAG, "updateLiveQrChip: text=${qrResult?.text}, isVisible=${chipView.isVisible}")
 
         if (qrResult == null) {
             if (chipView.isVisible) {

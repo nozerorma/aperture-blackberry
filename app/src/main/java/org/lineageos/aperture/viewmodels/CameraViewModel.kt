@@ -55,6 +55,7 @@ import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.runningFold
 import kotlinx.coroutines.flow.shareIn
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -73,6 +74,7 @@ import org.lineageos.aperture.models.CameraConfiguration
 import org.lineageos.aperture.models.CameraFacing
 import org.lineageos.aperture.models.CameraMode
 import org.lineageos.aperture.models.CameraState
+import org.lineageos.aperture.models.QrResult
 import org.lineageos.aperture.models.ColorCorrectionAberrationMode
 import org.lineageos.aperture.models.DistortionCorrectionMode
 import org.lineageos.aperture.models.EdgeMode
@@ -829,13 +831,7 @@ class CameraViewModel(application: Application) : ApertureViewModel(application)
     /**
      * Live QR result (including nulls when QR leaves the frame).
      */
-    val liveQrResult by lazy {
-        qrImageAnalyzer.rawQrResult
-            .shareIn(
-                scope = viewModelScope,
-                started = SharingStarted.WhileSubscribed(),
-            )
-    }
+    val liveQrResult: StateFlow<QrResult?> get() = qrImageAnalyzer.rawQrResult
 
     /**
      * Whether the camera can be flipped.

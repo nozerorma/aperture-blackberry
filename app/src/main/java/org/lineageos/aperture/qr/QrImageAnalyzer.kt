@@ -25,10 +25,8 @@ class QrImageAnalyzer(
     // QR
     private val reader by lazy {
         BarcodeReader().apply {
-            options.formats = setOf(BarcodeReader.Format.ALL)
             options.tryInvert = true
             options.tryRotate = true
-            options.tryHarder = true
             options.tryDownscale = true
         }
     }
@@ -47,15 +45,16 @@ class QrImageAnalyzer(
     override fun analyze(image: ImageProxy) {
         image.use {
             val now = SystemClock.uptimeMillis()
-            // Throttle to 4 checks/sec: 0 lag on viewfinder, very low CPU/battery consumption
-            if (now - lastAnalyzedTimestamp < 250L) {
+            // Throttle to ~8 checks/sec: real-time responsive on viewfinder, minimal CPU hit
+            if (now - lastAnalyzedTimestamp < 120L) {
                 return
             }
             lastAnalyzedTimestamp = now
 
             val results = try {
                 reader.read(image)
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                android.util.Log.e("QrImageAnalyzer", "Error reading barcode image", e)
                 emptyList()
             }
 
@@ -69,10 +68,15 @@ class QrImageAnalyzer(
                 isDismissed = false
                 if (rawText != lastRawText || _qrResult.value == null) {
                     lastRawText = rawText
-                    android.util.Log.d("QrImageAnalyzer", "Live QR detected: $rawText")
+                    android.util.Log.d("QrImageAnalyzer", "Live QR detected: $rawText, classifying...")
                     coroutineScope.launch(Dispatchers.IO) {
-                        val classified = qrTextClassifier.classify(firstResult)
-                        _qrResult.value = classified
+                        try {
+                            val classified = qrTextClassifier.classify(firstResult)
+                            android.util.Log.d("QrImageAnalyzer", "Live QR classified: ${classified.text}, actions=${classified.actions.size}")
+                            _qrResult.value = classified
+                        } catch (e: Exception) {
+                            android.util.Log.e("QrImageAnalyzer", "Error classifying QR result", e)
+                        }
                     }
                 }
             } else {
@@ -81,6 +85,7 @@ class QrImageAnalyzer(
                     isDismissed = false
                     lastRawText = null
                     if (_qrResult.value != null) {
+                        android.util.Log.d("QrImageAnalyzer", "Live QR cleared (left viewfinder)")
                         _qrResult.value = null
                     }
                 }
