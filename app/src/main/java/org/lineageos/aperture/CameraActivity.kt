@@ -46,6 +46,7 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import android.content.res.ColorStateList
+import android.content.res.Configuration
 import android.graphics.ColorMatrix
 import android.graphics.ColorMatrixColorFilter
 import android.graphics.RenderEffect
@@ -254,85 +255,67 @@ open class CameraActivity : AppCompatActivity(R.layout.activity_camera) {
     data class ResolutionOption(
         val label: String,
         val size: Size,
-        val mp: String
+        val mp: String,
+        val captureSize: Size = size
     )
 
     private fun getAvailableResolutions(ratio: Int, isSquare: Boolean, is3_2: Boolean): List<ResolutionOption> {
         val currentCamera = viewModel.currentCamera
         val allSizes = currentCamera?.supportedPhotoResolutions.orEmpty()
-        if (allSizes.isEmpty()) {
-            return when {
-                isSquare -> listOf(
-                    ResolutionOption("8.9 MP", Size(2976, 2976), "2976×2976"),
-                    ResolutionOption("0.5 MP", Size(720, 720), "720×720")
-                )
-                is3_2 -> listOf(
-                    ResolutionOption("11 MP", Size(3996, 2664), "3996×2664")
-                )
-                ratio == AspectRatio.RATIO_16_9 -> listOf(
-                    ResolutionOption("8.3 MP (4K)", Size(3840, 2160), "3840×2160"),
-                    ResolutionOption("2.1 MP (1080p)", Size(1920, 1080), "1920×1080")
-                )
-                else -> listOf(
-                    ResolutionOption("12 MP", Size(4032, 3024), "4032×3024"),
-                    ResolutionOption("8 MP", Size(3264, 2448), "3264×2448"),
-                    ResolutionOption("5 MP", Size(2560, 1920), "2560×1920")
-                )
-            }
-        }
 
-        if (isSquare) {
-            val nativeSquares = allSizes.filter { it.width == it.height }
-            if (nativeSquares.isNotEmpty()) {
-                return nativeSquares.take(4).map { size ->
-                    val mp = (size.width.toLong() * size.height.toLong()).toFloat() / 1_000_000f
-                    val label = if (mp >= 10f) String.format(Locale.US, "%.0f MP", mp) else String.format(Locale.US, "%.1f MP", mp)
-                    ResolutionOption(label, size, "${size.width}×${size.height}")
-                }
-            } else {
-                val sizes4_3 = allSizes.filter {
-                    val w = maxOf(it.width, it.height).toFloat()
-                    val h = minOf(it.width, it.height).toFloat()
-                    Math.abs((w / h) - (4f / 3f)) < 0.05f
-                }
-                return sizes4_3.take(4).map { size ->
-                    val dim = minOf(size.width, size.height)
-                    val squareSize = Size(dim, dim)
-                    val mp = (dim.toLong() * dim.toLong()).toFloat() / 1_000_000f
-                    val label = if (mp >= 10f) String.format(Locale.US, "%.0f MP", mp) else String.format(Locale.US, "%.1f MP", mp)
-                    ResolutionOption(label, squareSize, "${dim}×${dim}")
-                }
-            }
-        }
-
-        val targetAspect = when {
-            is3_2 -> 3.0f / 2.0f
-            ratio == AspectRatio.RATIO_16_9 -> 16.0f / 9.0f
-            else -> 4.0f / 3.0f
-        }
-
-        val filtered = allSizes.filter {
+        // Find all native 4:3 sensor resolutions (full sensor area)
+        val sizes4_3 = allSizes.filter {
             val w = maxOf(it.width, it.height).toFloat()
             val h = minOf(it.width, it.height).toFloat()
-            Math.abs((w / h) - targetAspect) < 0.05f
+            abs((w / h) - (4f / 3f)) < 0.05f
+        }.ifEmpty {
+            listOf(Size(4032, 3024), Size(3264, 2448), Size(2560, 1920), Size(1920, 1440))
         }
 
-        val candidates = if (filtered.isNotEmpty()) filtered.take(4) else allSizes.take(3)
-        return candidates.map { size ->
-            val w = maxOf(size.width, size.height)
-            val h = minOf(size.width, size.height)
-            val mp = (w.toLong() * h.toLong()).toFloat() / 1_000_000f
-            val label = when {
-                ratio == AspectRatio.RATIO_16_9 && w == 3840 && h == 2160 -> "8.3 MP (4K)"
-                ratio == AspectRatio.RATIO_16_9 && w == 1920 && h == 1080 -> "2.1 MP (1080p)"
-                mp >= 10f -> String.format(Locale.US, "%.0f MP", mp)
-                else -> String.format(Locale.US, "%.1f MP", mp)
+        return when {
+            isSquare -> {
+                sizes4_3.take(4).map { capSize ->
+                    val dim = minOf(capSize.width, capSize.height)
+                    val sqSize = Size(dim, dim)
+                    val mp = (dim.toLong() * dim.toLong()).toFloat() / 1_000_000f
+                    val label = if (mp >= 10f) String.format(Locale.US, "%.0f MP", mp) else String.format(Locale.US, "%.1f MP", mp)
+                    ResolutionOption(label, sqSize, "${dim}×${dim}", capSize)
+                }
             }
-            ResolutionOption(label, Size(w, h), "${w}×${h}")
+            ratio == AspectRatio.RATIO_16_9 && !isSquare && !is3_2 -> {
+                sizes4_3.take(4).map { capSize ->
+                    val w = maxOf(capSize.width, capSize.height)
+                    val h = (w * 9) / 16
+                    val rSize = Size(w, h)
+                    val mp = (w.toLong() * h.toLong()).toFloat() / 1_000_000f
+                    val label = if (mp >= 10f) String.format(Locale.US, "%.0f MP", mp) else String.format(Locale.US, "%.1f MP", mp)
+                    ResolutionOption(label, rSize, "${w}×${h}", capSize)
+                }
+            }
+            is3_2 -> {
+                sizes4_3.take(4).map { capSize ->
+                    val w = maxOf(capSize.width, capSize.height)
+                    val h = (w * 2) / 3
+                    val rSize = Size(w, h)
+                    val mp = (w.toLong() * h.toLong()).toFloat() / 1_000_000f
+                    val label = if (mp >= 10f) String.format(Locale.US, "%.0f MP", mp) else String.format(Locale.US, "%.1f MP", mp)
+                    ResolutionOption(label, rSize, "${w}×${h}", capSize)
+                }
+            }
+            else -> {
+                sizes4_3.take(4).map { capSize ->
+                    val w = capSize.width
+                    val h = capSize.height
+                    val mp = (w.toLong() * h.toLong()).toFloat() / 1_000_000f
+                    val label = if (mp >= 10f) String.format(Locale.US, "%.0f MP", mp) else String.format(Locale.US, "%.1f MP", mp)
+                    ResolutionOption(label, capSize, "${w}×${h}", capSize)
+                }
+            }
         }
     }
 
     private var currentTargetResolution: Size? = null
+    private var currentCaptureResolution: Size? = null
     private var currentResolutionLabel: String = "12 MP"
 
     private var currentIso: Int? = null
@@ -847,6 +830,8 @@ open class CameraActivity : AppCompatActivity(R.layout.activity_camera) {
             windowInsets
         }
 
+        updateViewFinderFraming()
+
         // Set secondary top bar button callbacks
         aspectRatioButton.setOnClickListener { viewModel.cyclePhotoAspectRatio() }
         videoQualityButton.setOnClickListener { viewModel.cycleVideoQuality() }
@@ -1156,7 +1141,7 @@ open class CameraActivity : AppCompatActivity(R.layout.activity_camera) {
 
                         is Event.PhotoCaptureStatus.ImageSaved -> {
                             val savedUri = event.output.savedUri
-                            if (savedUri != null && (currentBbFilter != BbFilter.NONE || isSquareMode || is3_2Mode || currentTargetResolution != null)) {
+                            if (savedUri != null && (currentBbFilter != BbFilter.NONE || isSquareMode || is3_2Mode || currentSelectedRatio == AspectRatio.RATIO_16_9 || currentTargetResolution != null)) {
                                 processSavedPhoto(savedUri)
                             }
                             if (!viewModel.inSingleCaptureMode.value) {
@@ -1683,6 +1668,11 @@ open class CameraActivity : AppCompatActivity(R.layout.activity_camera) {
                         else -> throw Exception("Unknown aspect ratio $photoAspectRatio")
                     }
                 )
+
+                if (!isSquareMode && !is3_2Mode) {
+                    currentSelectedRatio = photoAspectRatio
+                    updateViewFinderFraming()
+                }
 
                 // Update BlackBerry Top Bar Aspect Ratio button
                 btnBbAspectRatio.setImageResource(
@@ -2232,24 +2222,19 @@ open class CameraActivity : AppCompatActivity(R.layout.activity_camera) {
                     currentSelectedRatio = opt.ratio
                     isSquareMode = opt.isSquare
                     is3_2Mode = opt.is3_2
-                    if (opt.isSquare) {
-                        viewFinder.scaleType = PreviewView.ScaleType.FILL_CENTER
-                    } else {
-                        viewFinder.scaleType = PreviewView.ScaleType.FIT_CENTER
-                    }
+                    updateViewFinderFraming()
                     btnBbAspectRatio.setImageResource(opt.iconRes)
 
                     // Ensure target resolution matches this format
                     val resList = getAvailableResolutions(opt.ratio, opt.isSquare, opt.is3_2)
                     val def = resList.find { it.size == currentTargetResolution } ?: resList.getOrNull(0) ?: resList.first()
                     currentTargetResolution = def.size
+                    currentCaptureResolution = def.captureSize
                     currentResolutionLabel = def.label
 
-                    if (viewModel.photoAspectRatio.value != opt.ratio) {
-                        viewModel.setPhotoAspectRatio(opt.ratio)
-                    } else {
-                        viewModel.rebindCamera()
-                    }
+                    val underlyingRatio = if (opt.isSquare || opt.is3_2) AspectRatio.RATIO_4_3 else opt.ratio
+                    viewModel.setPhotoAspectRatio(underlyingRatio)
+                    viewModel.rebindCamera()
                     showAspectRatioSubmenu()
                 }
             }
@@ -2263,6 +2248,7 @@ open class CameraActivity : AppCompatActivity(R.layout.activity_camera) {
         if (currentTargetResolution == null || resList.none { it.size == currentTargetResolution }) {
             resList.firstOrNull()?.let {
                 currentTargetResolution = it.size
+                currentCaptureResolution = it.captureSize
                 currentResolutionLabel = it.label
             }
         }
@@ -2311,6 +2297,7 @@ open class CameraActivity : AppCompatActivity(R.layout.activity_camera) {
                 setPadding(10.px, 2.px, 10.px, 2.px)
                 setOnClickListener {
                     currentTargetResolution = opt.size
+                    currentCaptureResolution = opt.captureSize
                     currentResolutionLabel = opt.label
                     viewModel.rebindCamera()
                     Toast.makeText(this@CameraActivity, "${opt.label} (${opt.mp})", Toast.LENGTH_SHORT).show()
@@ -2803,8 +2790,8 @@ open class CameraActivity : AppCompatActivity(R.layout.activity_camera) {
 
     private fun processSavedPhoto(uri: Uri) {
         try {
-            val transform = contentResolver.openInputStream(uri)?.use { inputStream ->
-                ExifUtils.getTransform(inputStream)
+            val transform = contentResolver.openFileDescriptor(uri, "r")?.use { pfd ->
+                ExifUtils.getTransform(pfd.fileDescriptor)
             } ?: org.lineageos.aperture.models.Transform.DEFAULT
 
             val rawBitmap = contentResolver.openInputStream(uri)?.use { inputStream ->
@@ -2817,7 +2804,7 @@ open class CameraActivity : AppCompatActivity(R.layout.activity_camera) {
                 rawBitmap.recycle()
             }
 
-            // 1. Crop to square if in 1:1 mode, or 3:2 if in 3:2 mode
+            // 1. Crop according to active aspect ratio from full 4:3 sensor capture
             if (isSquareMode) {
                 val size = minOf(outputBitmap.width, outputBitmap.height)
                 val x = (outputBitmap.width - size) / 2
@@ -2825,11 +2812,25 @@ open class CameraActivity : AppCompatActivity(R.layout.activity_camera) {
                 val square = Bitmap.createBitmap(outputBitmap, x, y, size, size)
                 if (outputBitmap != rawBitmap) outputBitmap.recycle()
                 outputBitmap = square
+            } else if (currentSelectedRatio == AspectRatio.RATIO_16_9 && !isSquareMode && !is3_2Mode) {
+                val isLandscape = outputBitmap.width >= outputBitmap.height
+                val targetW = if (isLandscape) outputBitmap.width else (outputBitmap.height * 9) / 16
+                val targetH = if (isLandscape) (outputBitmap.width * 9) / 16 else outputBitmap.height
+                if (targetW <= outputBitmap.width && targetH <= outputBitmap.height) {
+                    val x = (outputBitmap.width - targetW) / 2
+                    val y = (outputBitmap.height - targetH) / 2
+                    val cropped169 = Bitmap.createBitmap(outputBitmap, x, y, targetW, targetH)
+                    if (outputBitmap != rawBitmap) outputBitmap.recycle()
+                    outputBitmap = cropped169
+                }
             } else if (is3_2Mode) {
-                val targetHeight = (outputBitmap.width * 2) / 3
-                if (targetHeight <= outputBitmap.height) {
-                    val y = (outputBitmap.height - targetHeight) / 2
-                    val cropped32 = Bitmap.createBitmap(outputBitmap, 0, y, outputBitmap.width, targetHeight)
+                val isLandscape = outputBitmap.width >= outputBitmap.height
+                val targetW = if (isLandscape) outputBitmap.width else (outputBitmap.height * 2) / 3
+                val targetH = if (isLandscape) (outputBitmap.width * 2) / 3 else outputBitmap.height
+                if (targetW <= outputBitmap.width && targetH <= outputBitmap.height) {
+                    val x = (outputBitmap.width - targetW) / 2
+                    val y = (outputBitmap.height - targetH) / 2
+                    val cropped32 = Bitmap.createBitmap(outputBitmap, x, y, targetW, targetH)
                     if (outputBitmap != rawBitmap) outputBitmap.recycle()
                     outputBitmap = cropped32
                 }
@@ -2886,6 +2887,27 @@ open class CameraActivity : AppCompatActivity(R.layout.activity_camera) {
         } catch (e: Exception) {
             Log.e(LOG_TAG, "Failed to post-process photo", e)
         }
+    }
+
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        updateViewFinderFraming()
+    }
+
+    private fun updateViewFinderFraming() {
+        val isLandscape = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+        val ratioStr = when {
+            isSquareMode -> "1:1"
+            is3_2Mode -> if (isLandscape) "3:2" else "2:3"
+            currentSelectedRatio == AspectRatio.RATIO_16_9 -> if (isLandscape) "16:9" else "9:16"
+            else -> if (isLandscape) "4:3" else "3:4"
+        }
+        val params = viewFinder.layoutParams as? ConstraintLayout.LayoutParams ?: return
+        params.constrainedWidth = true
+        params.constrainedHeight = true
+        params.dimensionRatio = ratioStr
+        viewFinder.layoutParams = params
+        viewFinder.scaleType = PreviewView.ScaleType.FILL_CENTER
     }
 
     private suspend fun queueSetupWithCameraPermissions() {
@@ -3026,12 +3048,11 @@ open class CameraActivity : AppCompatActivity(R.layout.activity_camera) {
                     PhotoOutputFormat.RAW_JPEG -> ImageCapture.OUTPUT_FORMAT_RAW_JPEG
                 }
 
-                val currentRatio = if (isSquareMode || is3_2Mode) AspectRatio.RATIO_4_3 else currentSelectedRatio
-
+                // Always use native 4:3 for CameraX pipeline to leverage full sensor area
                 val previewResSelector = ResolutionSelector.Builder()
                     .setAspectRatioStrategy(
                         AspectRatioStrategy(
-                            currentRatio,
+                            AspectRatio.RATIO_4_3,
                             AspectRatioStrategy.FALLBACK_RULE_AUTO,
                         )
                     )
@@ -3041,12 +3062,12 @@ open class CameraActivity : AppCompatActivity(R.layout.activity_camera) {
                 val resBuilder = ResolutionSelector.Builder()
                     .setAspectRatioStrategy(
                         AspectRatioStrategy(
-                            currentRatio,
+                            AspectRatio.RATIO_4_3,
                             AspectRatioStrategy.FALLBACK_RULE_AUTO,
                         )
                     )
 
-                val targetRes = currentTargetResolution
+                val targetRes = currentCaptureResolution ?: currentTargetResolution
                 if (targetRes != null) {
                     resBuilder.setResolutionStrategy(
                         ResolutionStrategy(
@@ -3488,10 +3509,47 @@ open class CameraActivity : AppCompatActivity(R.layout.activity_camera) {
         handler.sendMessageDelayed(handler.obtainMessage(MSG_HIDE_ZOOM_SLIDER), 2500)
     }
 
+    private fun adjustExposureByStep(step: Float) {
+        viewModel.adjustExposureCompensationStep(step)
+        exposureLevel.progress = viewModel.currentExposureLevel
+        exposureLevel.isVisible = true
+        handler.removeMessages(MSG_HIDE_EXPOSURE_SLIDER)
+        handler.sendMessageDelayed(handler.obtainMessage(MSG_HIDE_EXPOSURE_SLIDER), 2500)
+    }
+
+    override fun dispatchGenericMotionEvent(event: MotionEvent): Boolean {
+        if (event.action == MotionEvent.ACTION_SCROLL) {
+            val vScroll = event.getAxisValue(MotionEvent.AXIS_VSCROLL)
+            if (abs(vScroll) > 0.001f) {
+                val halfWidth = (window.decorView.width.takeIf { it > 0 } ?: 1080) / 2f
+                val isLeftSide = event.x < halfWidth
+                // Inverted vertical scroll: scroll UP (+step) = Zoom IN / Brighter, scroll DOWN (-step) = Zoom OUT / Darker
+                val step = -vScroll * 0.05f
+                Log.d(LOG_TAG, "dispatchGenericMotionEvent: x=${event.x}, vScroll=$vScroll, left=$isLeftSide")
+                if (isLeftSide) {
+                    adjustZoomByStep(step)
+                } else {
+                    adjustExposureByStep(-vScroll * 1.5f)
+                }
+                return true
+            }
+        }
+        return super.dispatchGenericMotionEvent(event)
+    }
+
     override fun onGenericMotionEvent(event: MotionEvent): Boolean {
         val vScroll = event.getAxisValue(MotionEvent.AXIS_VSCROLL)
         if (abs(vScroll) > 0.001f) {
-            adjustZoomByStep(vScroll * 0.05f)
+            val halfWidth = (window.decorView.width.takeIf { it > 0 } ?: 1080) / 2f
+            val isLeftSide = event.x < halfWidth
+            // Inverted vertical scroll: scroll UP (+step) = Zoom IN / Brighter, scroll DOWN (-step) = Zoom OUT / Darker
+            val step = -vScroll * 0.05f
+            Log.d(LOG_TAG, "onGenericMotionEvent: x=${event.x}, vScroll=$vScroll, left=$isLeftSide")
+            if (isLeftSide) {
+                adjustZoomByStep(step)
+            } else {
+                adjustExposureByStep(-vScroll * 1.5f)
+            }
             return true
         }
         return super.onGenericMotionEvent(event)
@@ -3499,9 +3557,17 @@ open class CameraActivity : AppCompatActivity(R.layout.activity_camera) {
 
     override fun onTrackballEvent(event: MotionEvent): Boolean {
         if (event.action == MotionEvent.ACTION_MOVE) {
-            val deltaY = -event.y
+            val deltaY = event.y // Inverted direction
             if (abs(deltaY) > 0.001f) {
-                adjustZoomByStep(deltaY * 0.05f)
+                val halfWidth = (window.decorView.width.takeIf { it > 0 } ?: 1080) / 2f
+                val isLeftSide = event.x < halfWidth
+                val step = deltaY * 0.05f
+                Log.d(LOG_TAG, "onTrackballEvent: x=${event.x}, y=${event.y}, left=$isLeftSide")
+                if (isLeftSide) {
+                    adjustZoomByStep(step)
+                } else {
+                    adjustExposureByStep(deltaY * 1.5f)
+                }
                 return true
             }
         }

@@ -24,20 +24,23 @@ class ExifUtils {
             ExifInterface.ORIENTATION_TRANSVERSE to Transform(Rotation.ROTATION_90, true),
         )
 
-        private fun getOrientation(inputStream: InputStream): Int {
-            inputStream.mark(Int.MAX_VALUE)
-            val orientation =
-                ExifInterface(inputStream).getAttributeInt(ExifInterface.TAG_ORIENTATION, 0)
-            inputStream.reset()
-            return orientation
-        }
-
-        private fun orientationToTransform(exifOrientation: Int): Transform {
+        fun orientationToTransform(exifOrientation: Int): Transform {
             return orientationMap.getOrDefault(exifOrientation, Transform.DEFAULT)
         }
 
+        fun getTransform(fileDescriptor: java.io.FileDescriptor): Transform {
+            val orientation = ExifInterface(fileDescriptor).getAttributeInt(ExifInterface.TAG_ORIENTATION, 0)
+            return orientationToTransform(orientation)
+        }
+
         fun getTransform(inputStream: InputStream): Transform {
-            return orientationToTransform(getOrientation(inputStream))
+            val stream = if (inputStream.markSupported()) inputStream else java.io.BufferedInputStream(inputStream)
+            stream.mark(1024 * 1024)
+            val orientation = ExifInterface(stream).getAttributeInt(ExifInterface.TAG_ORIENTATION, 0)
+            try {
+                stream.reset()
+            } catch (_: Exception) {}
+            return orientationToTransform(orientation)
         }
     }
 }

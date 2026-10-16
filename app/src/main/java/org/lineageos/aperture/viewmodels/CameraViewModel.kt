@@ -1620,6 +1620,16 @@ class CameraViewModel(application: Application) : ApertureViewModel(application)
         this.exposureCompensationLevel.value = exposureCompensationLevel
     }
 
+    val currentExposureLevel: Float get() = exposureCompensationLevel.value
+
+    fun adjustExposureCompensationStep(stepDelta: Float) {
+        val range = currentCamera?.exposureCompensationRange ?: (-12..12)
+        val totalSteps = (range.endInclusive - range.start).coerceAtLeast(8)
+        val stepSize = 1.0f / totalSteps
+        val newLevel = (exposureCompensationLevel.value + stepDelta * stepSize).coerceIn(0f, 1f)
+        setExposureCompensationLevel(newLevel)
+    }
+
     /**
      * Apply the specified zoom smoothly. The value will be automatically clamped
      * between min and max.
