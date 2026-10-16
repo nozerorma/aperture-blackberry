@@ -4,7 +4,7 @@
      SPDX-License-Identifier: Apache-2.0
 -->
 <resources xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
-    <string name="app_name">카메라</string>
+    <string name="app_name">Blackberry Aperture</string>
     <string name="video_camera_label">캠코더</string>
     <string name="cancel_button_description">취소</string>
     <string name="confirm_button_description">확인</string>

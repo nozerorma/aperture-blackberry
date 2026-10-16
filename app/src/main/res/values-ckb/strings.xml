@@ -4,7 +4,7 @@
      SPDX-License-Identifier: Apache-2.0
 -->
 <resources xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
-    <string name="app_name">کامێرا</string>
+    <string name="app_name">Blackberry Aperture</string>
     <string name="video_camera_label">تۆمارکەری ڤیدیۆ</string>
     <string name="cancel_button_description">پاشگەزبوونەوە</string>
     <string name="confirm_button_description">پەسەندکردن</string>

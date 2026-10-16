@@ -4,7 +4,7 @@
      SPDX-License-Identifier: Apache-2.0
 -->
 <resources xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
-    <string name="app_name">Càmera</string>
+    <string name="app_name">Blackberry Aperture</string>
     <string name="video_camera_label">Càmera de vídeo</string>
     <string name="cancel_button_description">Cancel·la</string>
     <string name="confirm_button_description">Confirma</string>
@@ -238,4 +238,9 @@
     <string name="bb_update_latest">Ja tens la darrera versió (%1$s)</string>
     <string name="bb_update_checking">Cercant actualitzacions…</string>
     <string name="bb_update_error">No s\'ha pogut comprovar actualitzacions</string>
+
+    <!-- Panorama -->
+    <string name="panorama_hint_start">Prem el disparador i gira horitzontalment ▶</string>
+    <string name="panorama_hint_sweeping">Gira lentament de costat a costat… (toca per aturar)</string>
+    <string name="panorama_saved">Panoràmica desada correctament</string>
 </resources>

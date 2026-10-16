@@ -4,7 +4,7 @@
      SPDX-License-Identifier: Apache-2.0
 -->
 <resources xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
-    <string name="app_name">相机</string>
+    <string name="app_name">Blackberry Aperture</string>
     <string name="video_camera_label">摄像机</string>
     <string name="cancel_button_description">取消</string>
     <string name="confirm_button_description">确认</string>

@@ -54,6 +54,8 @@
             android:exported="true"
             android:launchMode="singleTask"
             android:screenOrientation="nosensor"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
             android:taskAffinity=".CameraActivity"
             android:theme="@style/Theme.Aperture.Camera"
             android:windowSoftInputMode="stateAlwaysHidden|adjustPan">

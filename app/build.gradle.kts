@@ -17,12 +17,21 @@ android {
     namespace = "org.lineageos.aperture"
     compileSdk = 36
 
+    signingConfigs {
+        create("blackberry") {
+            storeFile = file("keystore/blackberry_aperture.jks")
+            storePassword = "blackberry"
+            keyAlias = "blackberry_aperture"
+            keyPassword = "blackberry"
+        }
+    }
+
     defaultConfig {
-        applicationId = "org.lineageos.aperture"
+        applicationId = "org.lineageos.aperture.blackberry"
         minSdk = 26
         targetSdk = 36
-        versionCode = 3
-        versionName = "1.0.2"
+        versionCode = 4
+        versionName = "1.0.3"
     }
 
     buildTypes {
@@ -32,6 +41,8 @@ android {
 
             // Enables resource shrinking.
             isShrinkResources = true
+
+            signingConfig = signingConfigs.getByName("blackberry")
 
             // Includes the default ProGuard rules files.
             setProguardFiles(
@@ -43,8 +54,9 @@ android {
         }
 
         debug {
-            // Append .dev to package name so we won't conflict with AOSP build.
-            applicationIdSuffix = ".dev"
+            // High-performance non-debuggable build signed with dedicated blackberry keystore
+            isDebuggable = false
+            signingConfig = signingConfigs.getByName("blackberry")
         }
     }
 
