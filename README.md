@@ -2,8 +2,7 @@
 
 A customized, feature-rich camera app built on top of LineageOS Aperture and Android CameraX, redesigned with the iconic **BlackBerry Camera** UI/UX and **Material 3 Expressive** styling.
 
-Specifically optimized and tested for keyboard-centric devices such as the **Zinwa Q25** (square 720×720 display with physical trackball) and the **BlackBerry KEY2** (Android 16 / LineageOS 24).
-
+Specifically optimized and tested for keyboard-centric and unique form-factor devices such as the **BlackBerry KEY2** (capacitive touchpad keyboard) and the **Zinwa Q25** (square 720×720 display with physical trackball).
 
 ---
 
@@ -31,65 +30,86 @@ Specifically optimized and tested for keyboard-centric devices such as the **Zin
 
 ## ✨ Features
 
-- **BlackBerry Camera Experience**:
-  - Top & bottom gradient bars with iconic BlackBerry camera icons and styling.
-  - Camera Mode shortcut drawer with flat Monet accents: **Photo**, **Video**, **Pro**, **Portrait**, **Panorama**, and **Document Scanner**.
-  - Live Color Filters ribbon with rich thumbnail previews: *Normal*, *Portra 160*, *Ilford B&W*, *Agapantha*, *Infrared*, *Sepia*, *Freeze*, *Negative*, and more.
-  - Document scanner mode with real-time green corner alignment brackets.
+### ⌨️ Hardware Controls & Physical Keyboard Integration
+- **BlackBerry KEY2 Capacitive Touchpad Navigation**:
+  - **Split Touchpad Controls**:
+    - **Left Half** (letters Q–T, A–G, Alt–V): Controls smooth digital zoom with on-screen slider and tick marks.
+    - **Right Half** (letters Y–P, H–Enter, B–$): Controls high-sensitivity **Exposure Compensation (+EV / -EV)**.
+  - **Natural Scroll Direction**: Swipe UP to Zoom IN or increase brightness; swipe DOWN to Zoom OUT or darken.
+- **Zinwa Q25 Trackball & D-pad Navigation**:
+  - Roll up/down on the physical trackball or D-pad to smoothly adjust zoom.
+- **Physical Shutter Keys**:
+  - **Spacebar** (`KEYCODE_SPACE`) and **Enter Keys** (`KEYCODE_ENTER`, `KEYCODE_NUMPAD_ENTER`, `KEYCODE_DPAD_CENTER`) trigger instant photo capture or video recording toggle.
 
-- **Pro / Manual Controls**:
-  - Direct on-screen manual controls with large, touch-friendly dials for:
+### 📐 Full-Sensor Optimized Aspect Ratio Pipeline
+- **Native 4:3 Sensor Exploitation**: Hardware capture pipeline always leverages the full native 4:3 sensor area (e.g. 12.2 MP at 4032×3024) instead of low-quality hardware downscaling.
+- **Supported Formats**: **4:3**, **16:9**, **1:1 (Square)**, and **3:2**.
+- **1:1 Square Mode**: High-resolution centered crop using full vertical sensor height (**3024×3024** @ 9.15 MP) instead of hardware-degraded 2976×2976 crops.
+- **16:9 Mode**: Full-dimension centered crop (**4032×2268** in landscape, **2268×4032** in portrait @ 9.14 MP).
+- **Pixel-Accurate Viewfinder Framing**:
+  - Viewfinder dynamically adapts to active ratio with black letterboxing / pillarboxing.
+  - 3×3 grid lines, horizon leveler, and focus reticle perfectly match the captured photo area.
+
+### 🔍 Live In-Viewfinder QR Detection
+- Seamless, continuous QR code scanner built directly into the active viewfinder using **ZXing-cpp**.
+- Instant on-screen interactive chip with one-tap link opening / clipboard copy without needing to switch modes.
+- Dedicated **QR Scanner** mode in the drawer for full-screen barcode reading.
+
+### 🎛️ BlackBerry Camera UX & Pro Controls
+- **Iconic BlackBerry Styling**:
+  - Top & bottom gradient decks with classic BlackBerry camera icons and styling.
+  - Quick-access drawer for **Photo**, **Video**, **Pro**, and **QR Scanner** modes.
+- **Pro / Manual Photography Controls**:
+  - Direct on-screen manual dials for:
     - **EV** (Exposure Compensation)
     - **ISO** sensitivity
     - **Shutter Speed**
     - **White Balance (AWB)** presets
     - **Manual Focus (MF)** distance slider
+- **Live Color Filters Ribbon**:
+  - Real-time thumbnail previews with iconic film simulations: *Normal*, *Portra 160*, *Ilford B&W*, *Agapantha*, *Infrared*, *Sepia*, *Freeze*, and *Negative*.
 
-- **Aspect Ratio & Resolution Engine**:
-  - Full support for **4:3**, **16:9**, and **1:1 (Square)** aspect ratios.
-  - Live preview decoupling from sensor capture resolution: allows square preview on 1:1 displays while capturing at full sensor resolution.
-  - On-screen resolution picker for each format.
+### ⚡ Capture Latency & Zero Shutter Lag
+- Two-tiered latency configuration:
+  - **Min Latency** (Fast capture pipeline) with optional **ZSL (Zero Shutter Lag)** on/off toggle.
+  - **Max Quality** (Multi-frame post-processing and maximum image quality).
 
-- **Capture Latency & Zero Shutter Lag**:
-  - Two-tiered latency configuration:
-    - **Min Latency** (Fast capture pipeline) with optional **ZSL (Zero Shutter Lag)** on/off toggle.
-    - **Max Quality** (Multi-frame post-processing and maximum image quality).
-
-- **Hardware Controls & Physical Keyboard Integration**:
-  - **Enter Key** (`KEYCODE_ENTER`, `KEYCODE_NUMPAD_ENTER`, `KEYCODE_DPAD_CENTER`) triggers photo capture / video record toggle.
-  - **Trackball & D-pad Scroll**: Roll or press Up/Down on the physical trackball or D-pad to smoothly adjust digital/optical zoom.
-  - **Dual Vertical Tickers**:
-    - Left side: Smooth optical zoom slider with tick marks (activates on scroll, pinch, or tapping zoom indicator).
-    - Right side: Exposure / light bias slider (activates upon tap-to-focus).
-
-- **Multilingual Support**:
-  - Fully localized in **English**, **Spanish** (*Español*), and **Catalan** (*Català*).
+### 🌐 Multilingual Support
+- Fully localized in **English**, **Spanish** (*Español*), and **Catalan** (*Català*).
 
 ---
 
 ## 📱 Supported Devices
 
-- **Zinwa Q25** (LineageOS 24 / Android 15, 720×720 square screen)
-- **BlackBerry KEY2** (Android 16 / LineageOS, physical QWERTY keyboard)
-- Any modern Android device running Android 14+ (API 34+)
+- **BlackBerry KEY2** (Android 8.1 Oreo through Android 16 / LineageOS)
+- **Zinwa Q25** (Square 720×720 display, physical trackball)
+- **Any Android device** running Android 8.0+ (API 26+)
+
+*Note: Uses package ID `org.lineageos.aperture.blackberry`, allowing it to install alongside stock LineageOS Aperture without conflicts.*
 
 ---
 
-## 🚀 Building & Installing
+## 🚀 Installation & Releases
+
+Download pre-compiled, signed APKs from [GitHub Releases](https://github.com/nozerorma/aperture-blackberry/releases).
 
 ### Build from source
 ```bash
+# Debug build
 ./gradlew assembleDebug
+
+# Optimized Release build (ProGuard / R8)
+./gradlew assembleRelease
 ```
 
-The output APK will be generated at:
+Output APK will be located at:
 ```
-app/build/outputs/apk/debug/app-debug.apk
+app/build/outputs/apk/release/app-release.apk
 ```
 
 ### Install via ADB
 ```bash
-adb install -r app/build/outputs/apk/debug/app-debug.apk
+adb install -r app/build/outputs/apk/release/app-release.apk
 ```
 
 ---
