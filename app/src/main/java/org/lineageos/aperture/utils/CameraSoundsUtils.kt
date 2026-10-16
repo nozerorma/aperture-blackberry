@@ -11,12 +11,14 @@ import android.os.Build
 import org.lineageos.aperture.repositories.PreferencesRepository
 
 class CameraSoundsUtils(private val preferencesRepository: PreferencesRepository) {
-    private val mediaActionSound = MediaActionSound().apply {
-        // Preload all sounds to reduce latency
-        load(MediaActionSound.SHUTTER_CLICK)
-        load(MediaActionSound.START_VIDEO_RECORDING)
-        load(MediaActionSound.STOP_VIDEO_RECORDING)
-    }
+    private var _mediaActionSound: MediaActionSound? = null
+    private val mediaActionSound: MediaActionSound
+        get() = _mediaActionSound ?: MediaActionSound().apply {
+            load(MediaActionSound.SHUTTER_CLICK)
+            load(MediaActionSound.START_VIDEO_RECORDING)
+            load(MediaActionSound.STOP_VIDEO_RECORDING)
+            _mediaActionSound = this
+        }
 
     fun playShutterClick() {
         if (preferencesRepository.shutterSound.value || mustPlaySounds) {
@@ -38,7 +40,10 @@ class CameraSoundsUtils(private val preferencesRepository: PreferencesRepository
         }
     }
 
-    fun release() = mediaActionSound.release()
+    fun release() {
+        _mediaActionSound?.release()
+        _mediaActionSound = null
+    }
 
     companion object {
         val mustPlaySounds: Boolean

@@ -108,9 +108,13 @@ class CameraRepository(
     fun getExtensionEnabledCameraSelector(
         camera: Camera,
         mode: Int,
-    ): CameraSelector = extensionsManager.getExtensionEnabledCameraSelector(
-        camera.cameraSelector, mode
-    )
+    ): CameraSelector = if (mode == androidx.camera.extensions.ExtensionMode.NONE) {
+        camera.cameraSelector
+    } else {
+        extensionsManager.getExtensionEnabledCameraSelector(
+            camera.cameraSelector, mode
+        )
+    }
 
     private fun CameraInfo.isInternalCameraAllowed(): Boolean {
         val camera2CameraInfo = Camera2CameraInfo.from(this)
@@ -136,7 +140,7 @@ class CameraRepository(
 
     private fun CameraInfo.toCamera() = Camera.fromCameraX(
         this,
-        extensionsManager,
+        lazy { extensionsManager },
         overlaysRepository,
     )
 

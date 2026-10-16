@@ -28,3 +28,4 @@
 
 # Suppress warnings for the dynamically loaded camera extensions library
 -dontwarn androidx.camera.extensions.impl.advanced.**
+

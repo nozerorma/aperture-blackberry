@@ -41,12 +41,16 @@ class Camera private constructor(
     cameraInfo: CameraInfo,
     val logicalZoomRatios: SortedMap<Float, Float>,
     additionalVideoFrameRates: Map<Quality, Map<FrameRate, Boolean>>,
-    val supportedExtensionModes: Set<Int>,
+    extensionsManagerLazy: Lazy<ExtensionsManager>,
 ) {
     /**
      * The [androidx.camera.core.CameraSelector] for this camera.
      */
     val cameraSelector: CameraSelector = cameraInfo.cameraSelector
+
+    val supportedExtensionModes: Set<Int> by lazy {
+        extensionsManagerLazy.value.getSupportedModes(cameraSelector)
+    }
 
     /**
      * The [androidx.camera.camera2.interop.Camera2CameraInfo] of this camera.
@@ -69,24 +73,29 @@ class Camera private constructor(
         else -> throw Exception("Unknown lens facing value")
     }
 
-    val exposureCompensationRange =
+    val exposureCompensationRange by lazy {
         cameraInfo.exposureState.exposureCompensationRange.toClosedRange<Int>()
+    }
 
-    val intrinsicZoomRatio = cameraInfo.intrinsicZoomRatio
+    val intrinsicZoomRatio by lazy { cameraInfo.intrinsicZoomRatio }
 
-    private val imageCaptureCapabilities = ImageCapture.getImageCaptureCapabilities(cameraInfo)
+    private val imageCaptureCapabilities by lazy {
+        ImageCapture.getImageCaptureCapabilities(cameraInfo)
+    }
 
-    val supportedPhotoOutputFormats = imageCaptureCapabilities.supportedOutputFormats.map {
-        when (it) {
-            ImageCapture.OUTPUT_FORMAT_JPEG -> PhotoOutputFormat.JPEG
-            ImageCapture.OUTPUT_FORMAT_JPEG_ULTRA_HDR -> PhotoOutputFormat.JPEG_ULTRA_HDR
-            ImageCapture.OUTPUT_FORMAT_RAW -> PhotoOutputFormat.RAW
-            ImageCapture.OUTPUT_FORMAT_RAW_JPEG -> PhotoOutputFormat.RAW_JPEG
-            else -> error("Unknown CameraX output format $it")
+    val supportedPhotoOutputFormats by lazy {
+        imageCaptureCapabilities.supportedOutputFormats.map {
+            when (it) {
+                ImageCapture.OUTPUT_FORMAT_JPEG -> PhotoOutputFormat.JPEG
+                ImageCapture.OUTPUT_FORMAT_JPEG_ULTRA_HDR -> PhotoOutputFormat.JPEG_ULTRA_HDR
+                ImageCapture.OUTPUT_FORMAT_RAW -> PhotoOutputFormat.RAW
+                ImageCapture.OUTPUT_FORMAT_RAW_JPEG -> PhotoOutputFormat.RAW_JPEG
+                else -> error("Unknown CameraX output format $it")
+            }
         }
     }
 
-    val supportedPhotoResolutions: List<Size> = run {
+    val supportedPhotoResolutions: List<Size> by lazy {
         val map = camera2CameraInfo.getCameraCharacteristic(
             CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP
         )
@@ -99,21 +108,29 @@ class Camera private constructor(
         (normalSizes + highResSizes).distinct().sortedByDescending { it.width.toLong() * it.height.toLong() }
     }
 
-    private val supportedVideoFrameRates = cameraInfo.supportedFrameRateRanges.mapNotNull {
-        FrameRate.fromRange(it.toClosedRange())
-    }.toSet()
-
-    private val videoCapabilities = Recorder.getVideoCapabilities(cameraInfo)
-
-    private val supportedVideoDynamicRanges = videoCapabilities.supportedDynamicRanges.map {
-        VideoDynamicRange.fromDynamicRange(it)
+    private val supportedVideoFrameRates by lazy {
+        cameraInfo.supportedFrameRateRanges.mapNotNull {
+            FrameRate.fromRange(it.toClosedRange())
+        }.toSet()
     }
 
-    private val videoQualityForDynamicRanges = supportedVideoDynamicRanges.associateWith {
-        videoCapabilities.getSupportedQualities(it.dynamicRange)
+    private val videoCapabilities by lazy {
+        Recorder.getVideoCapabilities(cameraInfo)
     }
 
-    val supportedVideoQualities =
+    private val supportedVideoDynamicRanges by lazy {
+        videoCapabilities.supportedDynamicRanges.map {
+            VideoDynamicRange.fromDynamicRange(it)
+        }
+    }
+
+    private val videoQualityForDynamicRanges by lazy {
+        supportedVideoDynamicRanges.associateWith {
+            videoCapabilities.getSupportedQualities(it.dynamicRange)
+        }
+    }
+
+    val supportedVideoQualities: Map<Quality, VideoQualityInfo> by lazy {
         videoQualityForDynamicRanges.values.flatten().toSet().associateWith {
             VideoQualityInfo(
                 it,
@@ -131,28 +148,31 @@ class Camera private constructor(
                 }.map { dynamicRangeToQualities -> dynamicRangeToQualities.key }.toSet()
             )
         }
+    }
 
-    val supportedVideoStabilizationModes = buildList {
-        add(VideoStabilizationMode.OFF)
+    val supportedVideoStabilizationModes by lazy {
+        buildList {
+            add(VideoStabilizationMode.OFF)
 
-        val availableVideoStabilizationModes = camera2CameraInfo.getCameraCharacteristic(
-            CameraCharacteristics.CONTROL_AVAILABLE_VIDEO_STABILIZATION_MODES
-        ) ?: IntArray(0)
+            val availableVideoStabilizationModes = camera2CameraInfo.getCameraCharacteristic(
+                CameraCharacteristics.CONTROL_AVAILABLE_VIDEO_STABILIZATION_MODES
+            ) ?: IntArray(0)
 
-        if (
-            availableVideoStabilizationModes.contains(
-                CameraMetadata.CONTROL_VIDEO_STABILIZATION_MODE_ON
-            )
-        ) {
-            add(VideoStabilizationMode.ON)
-        }
-        if (
-            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-            availableVideoStabilizationModes.contains(
-                CameraMetadata.CONTROL_VIDEO_STABILIZATION_MODE_PREVIEW_STABILIZATION
-            )
-        ) {
-            add(VideoStabilizationMode.ON_PREVIEW)
+            if (
+                availableVideoStabilizationModes.contains(
+                    CameraMetadata.CONTROL_VIDEO_STABILIZATION_MODE_ON
+                )
+            ) {
+                add(VideoStabilizationMode.ON)
+            }
+            if (
+                Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                availableVideoStabilizationModes.contains(
+                    CameraMetadata.CONTROL_VIDEO_STABILIZATION_MODE_PREVIEW_STABILIZATION
+                )
+            ) {
+                add(VideoStabilizationMode.ON_PREVIEW)
+            }
         }
     }
 
@@ -160,92 +180,104 @@ class Camera private constructor(
 
     val cameraXCameraState = cameraInfo.cameraState.asFlow<CameraState>()
 
-    val supportedEdgeModes = camera2CameraInfo.getAndMapCameraCharacteristics(
-        CameraCharacteristics.EDGE_AVAILABLE_EDGE_MODES,
-    ) {
-        when (it) {
-            CameraCharacteristics.EDGE_MODE_OFF -> EdgeMode.OFF
-            CameraCharacteristics.EDGE_MODE_FAST -> EdgeMode.FAST
-            CameraCharacteristics.EDGE_MODE_HIGH_QUALITY -> EdgeMode.HIGH_QUALITY
-            CameraCharacteristics.EDGE_MODE_ZERO_SHUTTER_LAG -> EdgeMode.ZERO_SHUTTER_LAG
-            else -> null
-        }
-    }
-
-    val supportedNoiseReductionModes = camera2CameraInfo.getAndMapCameraCharacteristics(
-        CameraCharacteristics.NOISE_REDUCTION_AVAILABLE_NOISE_REDUCTION_MODES,
-    ) {
-        when (it) {
-            CameraCharacteristics.NOISE_REDUCTION_MODE_OFF -> NoiseReductionMode.OFF
-            CameraCharacteristics.NOISE_REDUCTION_MODE_FAST -> NoiseReductionMode.FAST
-            CameraCharacteristics.NOISE_REDUCTION_MODE_HIGH_QUALITY ->
-                NoiseReductionMode.HIGH_QUALITY
-
-            CameraCharacteristics.NOISE_REDUCTION_MODE_MINIMAL -> NoiseReductionMode.MINIMAL
-            CameraCharacteristics.NOISE_REDUCTION_MODE_ZERO_SHUTTER_LAG ->
-                NoiseReductionMode.ZERO_SHUTTER_LAG
-
-            else -> null
-        }
-    }
-
-    val supportedShadingModes = camera2CameraInfo.getAndMapCameraCharacteristics(
-        CameraCharacteristics.SHADING_AVAILABLE_MODES,
-    ) {
-        when (it) {
-            CameraCharacteristics.SHADING_MODE_OFF -> ShadingMode.OFF
-            CameraCharacteristics.SHADING_MODE_FAST -> ShadingMode.FAST
-            CameraCharacteristics.SHADING_MODE_HIGH_QUALITY -> ShadingMode.HIGH_QUALITY
-            else -> null
-        }
-    }
-
-    val supportedColorCorrectionAberrationModes = camera2CameraInfo.getAndMapCameraCharacteristics(
-        CameraCharacteristics.COLOR_CORRECTION_AVAILABLE_ABERRATION_MODES,
-    ) {
-        when (it) {
-            CameraCharacteristics.COLOR_CORRECTION_ABERRATION_MODE_OFF ->
-                ColorCorrectionAberrationMode.OFF
-
-            CameraCharacteristics.COLOR_CORRECTION_ABERRATION_MODE_FAST ->
-                ColorCorrectionAberrationMode.FAST
-
-            CameraCharacteristics.COLOR_CORRECTION_ABERRATION_MODE_HIGH_QUALITY ->
-                ColorCorrectionAberrationMode.HIGH_QUALITY
-
-            else -> null
-        }
-    }
-
-    val supportedDistortionCorrectionModes = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+    val supportedEdgeModes by lazy {
         camera2CameraInfo.getAndMapCameraCharacteristics(
-            CameraCharacteristics.DISTORTION_CORRECTION_AVAILABLE_MODES,
+            CameraCharacteristics.EDGE_AVAILABLE_EDGE_MODES,
         ) {
             when (it) {
-                CameraCharacteristics.DISTORTION_CORRECTION_MODE_OFF ->
-                    DistortionCorrectionMode.OFF
+                CameraCharacteristics.EDGE_MODE_OFF -> EdgeMode.OFF
+                CameraCharacteristics.EDGE_MODE_FAST -> EdgeMode.FAST
+                CameraCharacteristics.EDGE_MODE_HIGH_QUALITY -> EdgeMode.HIGH_QUALITY
+                CameraCharacteristics.EDGE_MODE_ZERO_SHUTTER_LAG -> EdgeMode.ZERO_SHUTTER_LAG
+                else -> null
+            }
+        }
+    }
 
-                CameraCharacteristics.DISTORTION_CORRECTION_MODE_FAST ->
-                    DistortionCorrectionMode.FAST
+    val supportedNoiseReductionModes by lazy {
+        camera2CameraInfo.getAndMapCameraCharacteristics(
+            CameraCharacteristics.NOISE_REDUCTION_AVAILABLE_NOISE_REDUCTION_MODES,
+        ) {
+            when (it) {
+                CameraCharacteristics.NOISE_REDUCTION_MODE_OFF -> NoiseReductionMode.OFF
+                CameraCharacteristics.NOISE_REDUCTION_MODE_FAST -> NoiseReductionMode.FAST
+                CameraCharacteristics.NOISE_REDUCTION_MODE_HIGH_QUALITY ->
+                    NoiseReductionMode.HIGH_QUALITY
 
-                CameraCharacteristics.DISTORTION_CORRECTION_MODE_HIGH_QUALITY ->
-                    DistortionCorrectionMode.HIGH_QUALITY
+                CameraCharacteristics.NOISE_REDUCTION_MODE_MINIMAL -> NoiseReductionMode.MINIMAL
+                CameraCharacteristics.NOISE_REDUCTION_MODE_ZERO_SHUTTER_LAG ->
+                    NoiseReductionMode.ZERO_SHUTTER_LAG
 
                 else -> null
             }
         }
-    } else {
-        setOf()
     }
 
-    val supportedHotPixelModes = camera2CameraInfo.getAndMapCameraCharacteristics(
-        CameraCharacteristics.HOT_PIXEL_AVAILABLE_HOT_PIXEL_MODES,
-    ) {
-        when (it) {
-            CameraCharacteristics.HOT_PIXEL_MODE_OFF -> HotPixelMode.OFF
-            CameraCharacteristics.HOT_PIXEL_MODE_FAST -> HotPixelMode.FAST
-            CameraCharacteristics.HOT_PIXEL_MODE_HIGH_QUALITY -> HotPixelMode.HIGH_QUALITY
-            else -> null
+    val supportedShadingModes by lazy {
+        camera2CameraInfo.getAndMapCameraCharacteristics(
+            CameraCharacteristics.SHADING_AVAILABLE_MODES,
+        ) {
+            when (it) {
+                CameraCharacteristics.SHADING_MODE_OFF -> ShadingMode.OFF
+                CameraCharacteristics.SHADING_MODE_FAST -> ShadingMode.FAST
+                CameraCharacteristics.SHADING_MODE_HIGH_QUALITY -> ShadingMode.HIGH_QUALITY
+                else -> null
+            }
+        }
+    }
+
+    val supportedColorCorrectionAberrationModes by lazy {
+        camera2CameraInfo.getAndMapCameraCharacteristics(
+            CameraCharacteristics.COLOR_CORRECTION_AVAILABLE_ABERRATION_MODES,
+        ) {
+            when (it) {
+                CameraCharacteristics.COLOR_CORRECTION_ABERRATION_MODE_OFF ->
+                    ColorCorrectionAberrationMode.OFF
+
+                CameraCharacteristics.COLOR_CORRECTION_ABERRATION_MODE_FAST ->
+                    ColorCorrectionAberrationMode.FAST
+
+                CameraCharacteristics.COLOR_CORRECTION_ABERRATION_MODE_HIGH_QUALITY ->
+                    ColorCorrectionAberrationMode.HIGH_QUALITY
+
+                else -> null
+            }
+        }
+    }
+
+    val supportedDistortionCorrectionModes by lazy {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            camera2CameraInfo.getAndMapCameraCharacteristics(
+                CameraCharacteristics.DISTORTION_CORRECTION_AVAILABLE_MODES,
+            ) {
+                when (it) {
+                    CameraCharacteristics.DISTORTION_CORRECTION_MODE_OFF ->
+                        DistortionCorrectionMode.OFF
+
+                    CameraCharacteristics.DISTORTION_CORRECTION_MODE_FAST ->
+                        DistortionCorrectionMode.FAST
+
+                    CameraCharacteristics.DISTORTION_CORRECTION_MODE_HIGH_QUALITY ->
+                        DistortionCorrectionMode.HIGH_QUALITY
+
+                    else -> null
+                }
+            }
+        } else {
+            setOf()
+        }
+    }
+
+    val supportedHotPixelModes by lazy {
+        camera2CameraInfo.getAndMapCameraCharacteristics(
+            CameraCharacteristics.HOT_PIXEL_AVAILABLE_HOT_PIXEL_MODES,
+        ) {
+            when (it) {
+                CameraCharacteristics.HOT_PIXEL_MODE_OFF -> HotPixelMode.OFF
+                CameraCharacteristics.HOT_PIXEL_MODE_FAST -> HotPixelMode.FAST
+                CameraCharacteristics.HOT_PIXEL_MODE_HIGH_QUALITY -> HotPixelMode.HIGH_QUALITY
+                else -> null
+            }
         }
     }
 
@@ -274,7 +306,8 @@ class Camera private constructor(
     override fun hashCode() = this::class.qualifiedName.hashCode() + cameraId.hashCode()
 
     fun supportsExtensionMode(extensionMode: Int): Boolean {
-        return supportedExtensionModes.contains(extensionMode)
+        return extensionMode == androidx.camera.extensions.ExtensionMode.NONE ||
+                supportedExtensionModes.contains(extensionMode)
     }
 
     fun supportsCameraMode(cameraMode: CameraMode): Boolean {
@@ -294,7 +327,7 @@ class Camera private constructor(
     companion object {
         fun fromCameraX(
             cameraXCameraInfo: CameraInfo,
-            extensionsManager: ExtensionsManager,
+            extensionsManagerLazy: Lazy<ExtensionsManager>,
             overlaysRepository: OverlaysRepository,
         ): Camera {
             val cameraId = Camera2CameraInfo.from(cameraXCameraInfo).cameraId
@@ -307,15 +340,12 @@ class Camera private constructor(
             }.toSortedMap()
             val additionalVideoFrameRates =
                 overlaysRepository.additionalVideoConfigurations[cameraId].orEmpty()
-            val supportedExtensionModes = extensionsManager.getSupportedModes(
-                cameraXCameraInfo.cameraSelector
-            )
 
             return Camera(
                 cameraXCameraInfo,
                 logicalZoomRatios,
                 additionalVideoFrameRates,
-                supportedExtensionModes,
+                extensionsManagerLazy,
             )
         }
     }

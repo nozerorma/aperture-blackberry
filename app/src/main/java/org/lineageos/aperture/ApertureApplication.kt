@@ -34,5 +34,11 @@ class ApertureApplication : Application() {
         CameraCompatibilityFilter.setBackwardCompatibleCameraIds(
             overlaysRepository.backwardCompatibleCameraIds.asList()
         )
+
+        // Pre-warm CameraX provider in parallel with Activity creation
+        try {
+            androidx.camera.lifecycle.ProcessCameraProvider.getInstance(this)
+        } catch (_: Exception) {
+        }
     }
 }
