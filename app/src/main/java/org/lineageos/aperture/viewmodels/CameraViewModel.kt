@@ -154,7 +154,7 @@ class CameraViewModel(application: Application) : ApertureViewModel(application)
     /**
      * QR image analyzer.
      */
-    val qrImageAnalyzer = QrImageAnalyzer(applicationContext, viewModelScope)
+    val qrImageAnalyzer by lazy { QrImageAnalyzer(applicationContext, viewModelScope) }
 
     /**
      * Do not emit here directly, use [emitEvent].
@@ -667,15 +667,7 @@ class CameraViewModel(application: Application) : ApertureViewModel(application)
      * Whether the user should be able to select a photo effect.
      */
     @androidx.annotation.OptIn(ExperimentalZeroShutterLag::class)
-    val isPhotoEffectButtonVisible = combine(
-        cameraConfiguration,
-        cameraMode,
-        photoCaptureMode,
-    ) { cameraConfiguration, cameraMode, photoCaptureMode ->
-        cameraMode == CameraMode.PHOTO &&
-                photoCaptureMode != ImageCapture.CAPTURE_MODE_ZERO_SHUTTER_LAG &&
-                cameraConfiguration.camera.supportedExtensionModes.size > 1
-    }
+    val isPhotoEffectButtonVisible = kotlinx.coroutines.flow.flowOf(false)
 
     // Video
 
@@ -698,10 +690,13 @@ class CameraViewModel(application: Application) : ApertureViewModel(application)
         )
 
     val isVideoQualityButtonEnabled = combine(
-        camera,
+        cameraConfiguration,
         cameraState,
-    ) { camera, cameraState ->
-        cameraState == CameraState.IDLE && camera.supportedVideoQualities.size > 1
+    ) { cameraConfiguration, cameraState ->
+        cameraState == CameraState.IDLE && when (cameraConfiguration) {
+            is CameraConfiguration.Video -> cameraConfiguration.camera.supportedVideoQualities.size > 1
+            else -> false
+        }
     }
         .flowOn(Dispatchers.IO)
         .stateIn(
@@ -823,11 +818,24 @@ class CameraViewModel(application: Application) : ApertureViewModel(application)
     /**
      * QR result.
      */
-    val qrResult = qrImageAnalyzer.qrResult
-        .shareIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(),
-        )
+    val qrResult by lazy {
+        qrImageAnalyzer.qrResult
+            .shareIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(),
+            )
+    }
+
+    /**
+     * Live QR result (including nulls when QR leaves the frame).
+     */
+    val liveQrResult by lazy {
+        qrImageAnalyzer.rawQrResult
+            .shareIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(),
+            )
+    }
 
     /**
      * Whether the camera can be flipped.
@@ -1124,6 +1132,8 @@ class CameraViewModel(application: Application) : ApertureViewModel(application)
                 cameraState.value = CameraState.IDLE
             }
         }
+
+        cameraController.flashMode = flashMode.value
 
         when (imageOutputFormat) {
             ImageCapture.OUTPUT_FORMAT_RAW_JPEG -> {

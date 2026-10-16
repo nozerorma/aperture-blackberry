@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+     SPDX-FileCopyrightText: The LineageOS Project
+     SPDX-License-Identifier: Apache-2.0
+-->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/bbLiveQrChipContainer"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:visibility="gone">
+
+    <com.google.android.material.card.MaterialCardView
+        android:id="@+id/cardQrChip"
+        android:layout_width="wrap_content"
+        android:layout_height="48dp"
+        android:clickable="true"
+        android:focusable="true"
+        android:foreground="?attr/selectableItemBackground"
+        app:cardBackgroundColor="#E61E1E1E"
+        app:cardCornerRadius="24dp"
+        app:cardElevation="6dp"
+        app:strokeColor="#40FFFFFF"
+        app:strokeWidth="1dp">
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="14dp"
+            android:paddingEnd="10dp">
+
+            <ImageView
+                android:id="@+id/ivQrChipIcon"
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:layout_marginEnd="10dp"
+                android:contentDescription="@string/qr_icon_description"
+                android:src="@drawable/ic_shortcut_qr"
+                app:tint="@android:color/white" />
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/tvQrChipTitle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:ellipsize="end"
+                    android:maxWidth="200dp"
+                    android:singleLine="true"
+                    android:textColor="@android:color/white"
+                    android:textSize="13sp"
+                    android:textStyle="bold"
+                    tools:text="https://lineageos.org" />
+
+                <TextView
+                    android:id="@+id/tvQrChipSubtitle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:ellipsize="end"
+                    android:maxWidth="200dp"
+                    android:singleLine="true"
+                    android:textColor="#B3FFFFFF"
+                    android:textSize="11sp"
+                    android:visibility="gone"
+                    tools:text="Open URL" />
+            </LinearLayout>
+
+            <ImageView
+                android:id="@+id/ivQrChipAction"
+                android:layout_width="16dp"
+                android:layout_height="16dp"
+                android:layout_marginStart="8dp"
+                android:layout_marginEnd="6dp"
+                android:contentDescription="@string/qr_uri_title"
+                android:src="@drawable/ic_open_in_browser"
+                app:tint="@android:color/white" />
+
+            <View
+                android:layout_width="1dp"
+                android:layout_height="20dp"
+                android:layout_marginStart="4dp"
+                android:layout_marginEnd="6dp"
+                android:background="#33FFFFFF" />
+
+            <ImageView
+                android:id="@+id/ivQrChipClose"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:clickable="true"
+                android:contentDescription="@string/cancel_button_description"
+                android:focusable="true"
+                android:padding="4dp"
+                android:src="@drawable/ic_close"
+                app:tint="#B3FFFFFF" />
+        </LinearLayout>
+    </com.google.android.material.card.MaterialCardView>
+
+</FrameLayout>

@@ -7,9 +7,11 @@ package org.lineageos.aperture
 
 import android.animation.ValueAnimator
 import android.app.KeyguardManager
+import android.app.PendingIntent
 import android.content.ClipData
 import android.content.Intent
 import android.content.pm.ActivityInfo
+import org.lineageos.aperture.ext.sendWithBalAllowed
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Canvas
@@ -46,12 +48,30 @@ import android.widget.Toast
 import android.content.res.ColorStateList
 import android.graphics.ColorMatrix
 import android.graphics.ColorMatrixColorFilter
+import android.graphics.PointF
+import android.graphics.PorterDuff
+import android.graphics.PorterDuffXfermode
+import android.graphics.RadialGradient
 import android.graphics.RenderEffect
+import android.graphics.Shader
 import android.graphics.Typeface
+import android.media.FaceDetector
 import android.graphics.drawable.Drawable
-import android.util.Size
 import android.view.Gravity
 import java.util.Locale
+import android.util.Size
+import android.content.ContentValues
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
+import android.os.Environment
+import android.widget.ProgressBar
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.withContext
+import org.lineageos.aperture.ext.stackBlur
+import org.lineageos.aperture.ext.transform
+import org.lineageos.aperture.models.QrResult
 import com.google.android.material.card.MaterialCardView
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
@@ -222,13 +242,11 @@ open class CameraActivity : AppCompatActivity(R.layout.activity_camera) {
     private val modeItemPro by lazy { findViewById<LinearLayout>(R.id.modeItemPro) }
     private val modeItemPortrait by lazy { findViewById<LinearLayout>(R.id.modeItemPortrait) }
     private val modeItemPanorama by lazy { findViewById<LinearLayout>(R.id.modeItemPanorama) }
-    private val modeItemScanner by lazy { findViewById<LinearLayout>(R.id.modeItemScanner) }
     private val ivModeIconPhoto by lazy { findViewById<ImageView>(R.id.ivModeIconPhoto) }
     private val ivModeIconVideo by lazy { findViewById<ImageView>(R.id.ivModeIconVideo) }
     private val ivModeIconPro by lazy { findViewById<ImageView>(R.id.ivModeIconPro) }
     private val ivModeIconPortrait by lazy { findViewById<ImageView>(R.id.ivModeIconPortrait) }
     private val ivModeIconPanorama by lazy { findViewById<ImageView>(R.id.ivModeIconPanorama) }
-    private val ivModeIconScanner by lazy { findViewById<ImageView>(R.id.ivModeIconScanner) }
 
     private val bbFilterButton by lazy { findViewById<ImageButton>(R.id.bbFilterButton) }
     private val bbFilterRibbonContainer by lazy { findViewById<HorizontalScrollView>(R.id.bbFilterRibbonLayout) }
@@ -247,9 +265,29 @@ open class CameraActivity : AppCompatActivity(R.layout.activity_camera) {
     private val bbProSubmenuScroll by lazy { findViewById<HorizontalScrollView>(R.id.bbProSubmenuScroll) }
     private val bbProSubmenuList by lazy { findViewById<LinearLayout>(R.id.bbProSubmenuList) }
 
-    private val scannerReticleLayout by lazy { findViewById<FrameLayout>(R.id.scannerReticleLayout) }
     private val panoramaGuideLayout by lazy { findViewById<LinearLayout>(R.id.panoramaGuideLayout) }
-    private val portraitGuideLayout by lazy { findViewById<LinearLayout>(R.id.portraitGuideLayout) }
+    private val tvPanoramaStatus by lazy { findViewById<TextView>(R.id.tvPanoramaStatus) }
+    private val pbPanoramaProgress by lazy { findViewById<ProgressBar>(R.id.pbPanoramaProgress) }
+    private val ivPanoramaThumb by lazy { findViewById<ImageView>(R.id.ivPanoramaThumb) }
+    private val portraitGuideLayout by lazy { findViewById<FrameLayout>(R.id.portraitGuideLayout) }
+
+    private val sensorManager by lazy { getSystemService(SensorManager::class.java) }
+    private val gyroSensor by lazy { sensorManager?.getDefaultSensor(Sensor.TYPE_GYROSCOPE) }
+    private var isCapturingPanorama: Boolean = false
+    private var panoramaBitmap: Bitmap? = null
+    private var panoramaCanvas: Canvas? = null
+    private var panoCurrentX: Int = 0
+    private var panoAccumulatedAngle: Float = 0f
+    private var panoramaJob: Job? = null
+
+    private val gyroListener = object : SensorEventListener {
+        override fun onSensorChanged(event: SensorEvent?) {
+            if (!isCapturingPanorama || event == null) return
+            val yawRate = event.values[1]
+            panoAccumulatedAngle += yawRate * 0.045f
+        }
+        override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
+    }
 
     private var isSquareMode: Boolean = false
     private var isHdrEnabled: Boolean = false
@@ -465,8 +503,125 @@ open class CameraActivity : AppCompatActivity(R.layout.activity_camera) {
     private val secureMediaUris = ArrayDeque<Uri>()
 
     // QR
-    private val qrBottomSheetDialog by lazy { QrBottomSheetDialog(this) }
+    private val qrBottomSheetDialog by lazy {
+        QrBottomSheetDialog(this).apply {
+            setOnDismissListener {
+                viewModel.onQrDialogDismissed()
+            }
+        }
+    }
+    private val liveQrChipContainer by lazy { findViewById<View>(R.id.bbLiveQrChipContainer) }
+    private val cardQrChip by lazy { findViewById<View>(R.id.cardQrChip) }
+    private val tvQrChipTitle by lazy { findViewById<TextView>(R.id.tvQrChipTitle) }
+    private val tvQrChipSubtitle by lazy { findViewById<TextView>(R.id.tvQrChipSubtitle) }
+    private val ivQrChipIcon by lazy { findViewById<ImageView>(R.id.ivQrChipIcon) }
+    private val ivQrChipClose by lazy { findViewById<View>(R.id.ivQrChipClose) }
+    private var currentLiveQrResult: QrResult? = null
+
+    private fun updateLiveQrChip(qrResult: QrResult?) {
+        val chipView = liveQrChipContainer ?: return
+        currentLiveQrResult = qrResult
+
+        if (qrResult == null) {
+            if (chipView.isVisible) {
+                chipView.animate()
+                    .alpha(0f)
+                    .translationY(20f)
+                    .setDuration(200)
+                    .withEndAction { chipView.isVisible = false }
+                    .start()
+            }
+            return
+        }
+
+        // Don't show QR chip if mode grid is currently open or mode is video
+        if (bbModeGridContainer.isVisible || viewModel.cameraMode.value == CameraMode.VIDEO) {
+            chipView.isVisible = false
+            return
+        }
+
+        val firstAction = qrResult.actions.firstOrNull()
+        val rawText = qrResult.text.orEmpty().trim()
+
+        val isUrl = rawText.startsWith("http://", ignoreCase = true) || rawText.startsWith("https://", ignoreCase = true)
+        if (isUrl) {
+            val displayUrl = try {
+                val uri = Uri.parse(rawText)
+                val host = uri.host
+                if (!host.isNullOrEmpty()) {
+                    val path = uri.path
+                    if (!path.isNullOrEmpty() && path != "/") {
+                        "$host${path.take(20)}"
+                    } else {
+                        host
+                    }
+                } else {
+                    rawText
+                }
+            } catch (_: Exception) {
+                rawText
+            }
+            tvQrChipTitle.text = displayUrl
+            tvQrChipSubtitle.text = firstAction?.title ?: getString(R.string.qr_uri_title)
+            tvQrChipSubtitle.isVisible = true
+        } else {
+            tvQrChipTitle.text = firstAction?.title ?: rawText
+            if (!firstAction?.title.isNullOrEmpty() && rawText != firstAction?.title) {
+                tvQrChipSubtitle.text = rawText
+                tvQrChipSubtitle.isVisible = true
+            } else {
+                tvQrChipSubtitle.isVisible = false
+            }
+        }
+
+        val iconDrawable = firstAction?.icon?.loadDrawable(this)
+        if (iconDrawable != null) {
+            ivQrChipIcon.setImageDrawable(iconDrawable)
+        } else {
+            ivQrChipIcon.setImageResource(R.drawable.ic_shortcut_qr)
+        }
+
+        cardQrChip.setOnClickListener {
+            if (firstAction?.pendingIntent != null) {
+                try {
+                    firstAction.pendingIntent.sendWithBalAllowed()
+                } catch (_: PendingIntent.CanceledException) {
+                    qrBottomSheetDialog.setQrResult(qrResult)
+                }
+            } else {
+                qrBottomSheetDialog.setQrResult(qrResult)
+            }
+        }
+
+        cardQrChip.setOnLongClickListener {
+            qrBottomSheetDialog.setQrResult(qrResult)
+            true
+        }
+
+        ivQrChipClose.setOnClickListener {
+            viewModel.onQrDialogDismissed()
+            chipView.animate()
+                .alpha(0f)
+                .translationY(20f)
+                .setDuration(150)
+                .withEndAction { chipView.isVisible = false }
+                .start()
+        }
+
+        if (!chipView.isVisible) {
+            chipView.alpha = 0f
+            chipView.translationY = 20f
+            chipView.isVisible = true
+            chipView.animate()
+                .alpha(1f)
+                .translationY(0f)
+                .setDuration(250)
+                .start()
+        }
+    }
+
     private val isGoogleLensAvailable by lazy { GoogleLensUtils.isGoogleLensAvailable(this) }
+    private var hasBoundCameraOnce = false
 
     private var viewFinderTouchEvent: MotionEvent? = null
     private val gestureDetector by lazy {
@@ -676,7 +831,9 @@ open class CameraActivity : AppCompatActivity(R.layout.activity_camera) {
         }
 
         // Register shortcuts
-        ShortcutsUtils.registerShortcuts(this)
+        lifecycleScope.launch(Dispatchers.IO) {
+            ShortcutsUtils.registerShortcuts(this@CameraActivity)
+        }
 
         // Initialize initial camera mode
         overrideInitialCameraMode()?.let {
@@ -781,6 +938,9 @@ open class CameraActivity : AppCompatActivity(R.layout.activity_camera) {
                     // Hide preview blur
                     previewBlurView.isVisible = false
 
+                    // Ensure flash/torch state is applied now that capture session is active
+                    viewModel.cameraController.flashMode = viewModel.flashMode.value
+
                     // Issue capture if requested via assistant
                     if ((launchedViaVoiceIntent || assistantIntent?.cameraOpenOnly != null)
                         && assistantIntent?.cameraOpenOnly != true
@@ -825,9 +985,18 @@ open class CameraActivity : AppCompatActivity(R.layout.activity_camera) {
         }
 
         shutterButton.setOnClickListener {
+            if (isPanoramaMode) {
+                if (isCapturingPanorama) {
+                    finishPanoramaSweep()
+                } else {
+                    startPanoramaSweep()
+                }
+                return@setOnClickListener
+            }
+
             // Shutter animation
             when (viewModel.cameraMode.value) {
-                CameraMode.PHOTO -> startShutterAnimation(ShutterAnimation.PhotoCapture)
+                CameraMode.PHOTO, CameraMode.QR -> startShutterAnimation(ShutterAnimation.PhotoCapture)
                 CameraMode.VIDEO -> {
                     if (countDownView.cancelCountDown()) {
                         viewModel.cameraState.value = CameraState.IDLE
@@ -838,15 +1007,12 @@ open class CameraActivity : AppCompatActivity(R.layout.activity_camera) {
                         startShutterAnimation(ShutterAnimation.VideoStart)
                     }
                 }
-
-                else -> {}
             }
 
             startTimerAndRun {
                 when (viewModel.cameraMode.value) {
-                    CameraMode.PHOTO -> viewModel.takePhoto()
+                    CameraMode.PHOTO, CameraMode.QR -> viewModel.takePhoto()
                     CameraMode.VIDEO -> viewModel.captureVideo()
-                    else -> {}
                 }
             }
         }
@@ -898,11 +1064,6 @@ open class CameraActivity : AppCompatActivity(R.layout.activity_camera) {
 
         // Bind viewfinder and preview blur view
         previewBlurView.previewView = viewFinder
-
-        // Observe QR dialog dismiss
-        qrBottomSheetDialog.setOnDismissListener {
-            viewModel.onQrDialogDismissed()
-        }
 
         // Initialize BlackBerry Camera UI
         setupBbUi()
@@ -973,7 +1134,14 @@ open class CameraActivity : AppCompatActivity(R.layout.activity_camera) {
         // Detach CameraController from PreviewView
         viewFinder.controller = null
 
+        cancelPanoramaSweep()
+
         super.onDestroy()
+    }
+
+    override fun onPause() {
+        super.onPause()
+        cancelPanoramaSweep()
     }
 
     override fun onResume() {
@@ -1039,7 +1207,7 @@ open class CameraActivity : AppCompatActivity(R.layout.activity_camera) {
 
                         is Event.PhotoCaptureStatus.ImageSaved -> {
                             val savedUri = event.output.savedUri
-                            if (savedUri != null && (currentBbFilter != BbFilter.NONE || isSquareMode || is3_2Mode || currentTargetResolution != null)) {
+                            if (savedUri != null && (currentBbFilter != BbFilter.NONE || isSquareMode || is3_2Mode || isPortraitMode || isPanoramaMode || currentTargetResolution != null)) {
                                 processSavedPhoto(savedUri)
                             }
                             if (!viewModel.inSingleCaptureMode.value) {
@@ -1098,6 +1266,7 @@ open class CameraActivity : AppCompatActivity(R.layout.activity_camera) {
                 updateModeGridHighlight()
                 btnBbAspectRatio.isVisible = true
                 btnBbHdr.isVisible = cameraMode == CameraMode.PHOTO && !isPortraitMode && !isPanoramaMode
+                updateLiveQrChip(null)
             }
         }
 
@@ -1784,8 +1953,14 @@ open class CameraActivity : AppCompatActivity(R.layout.activity_camera) {
         }
 
         launch {
-            viewModel.qrResult.collectLatest { qrResult ->
-                qrBottomSheetDialog.setQrResult(qrResult)
+            viewModel.liveQrResult.collectLatest { qrResult ->
+                if (viewModel.cameraMode.value == CameraMode.QR) {
+                    if (qrResult != null) {
+                        qrBottomSheetDialog.setQrResult(qrResult)
+                    }
+                } else {
+                    updateLiveQrChip(qrResult)
+                }
             }
         }
 
@@ -1809,6 +1984,9 @@ open class CameraActivity : AppCompatActivity(R.layout.activity_camera) {
                 llBbSubmenu.isVisible
         val isCountdown = viewModel.cameraState.value == CameraState.COUNTDOWN
         lensSelectorLayout.isVisible = !isAnyPopupOpen && !isCountdown
+        if (isAnyPopupOpen || isCountdown) {
+            liveQrChipContainer?.isVisible = false
+        }
     }
 
     private fun setupBbUi() {
@@ -1829,9 +2007,9 @@ open class CameraActivity : AppCompatActivity(R.layout.activity_camera) {
         }
 
         modeItemPhoto.setOnClickListener {
+            cancelPanoramaSweep()
             isPortraitMode = false
             isPanoramaMode = false
-            scannerReticleLayout.isVisible = false
             panoramaGuideLayout.isVisible = false
             portraitGuideLayout.isVisible = false
             bbProControlsContainer.isVisible = false
@@ -1843,9 +2021,9 @@ open class CameraActivity : AppCompatActivity(R.layout.activity_camera) {
         }
 
         modeItemVideo.setOnClickListener {
+            cancelPanoramaSweep()
             isPortraitMode = false
             isPanoramaMode = false
-            scannerReticleLayout.isVisible = false
             panoramaGuideLayout.isVisible = false
             portraitGuideLayout.isVisible = false
             bbProControlsContainer.isVisible = false
@@ -1856,9 +2034,9 @@ open class CameraActivity : AppCompatActivity(R.layout.activity_camera) {
         }
 
         modeItemPro.setOnClickListener {
+            cancelPanoramaSweep()
             isPortraitMode = false
             isPanoramaMode = false
-            scannerReticleLayout.isVisible = false
             panoramaGuideLayout.isVisible = false
             portraitGuideLayout.isVisible = false
             val show = !bbProControlsContainer.isVisible
@@ -1874,9 +2052,9 @@ open class CameraActivity : AppCompatActivity(R.layout.activity_camera) {
         }
 
         modeItemPortrait.setOnClickListener {
+            cancelPanoramaSweep()
             isPortraitMode = true
             isPanoramaMode = false
-            scannerReticleLayout.isVisible = false
             panoramaGuideLayout.isVisible = false
             portraitGuideLayout.isVisible = true
             bbProControlsContainer.isVisible = false
@@ -1886,14 +2064,18 @@ open class CameraActivity : AppCompatActivity(R.layout.activity_camera) {
             bbModeGridContainer.isVisible = false
             updateModeGridHighlight()
             updateOverlaysVisibility()
-            Toast.makeText(this, "Mode Retrat activat", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "Mode Retrat (bokeh òptic) activat", Toast.LENGTH_SHORT).show()
         }
 
         modeItemPanorama.setOnClickListener {
+            cancelPanoramaSweep()
             isPortraitMode = false
             isPanoramaMode = true
-            scannerReticleLayout.isVisible = false
             panoramaGuideLayout.isVisible = true
+            pbPanoramaProgress.progress = 0
+            pbPanoramaProgress.isVisible = false
+            ivPanoramaThumb.isVisible = false
+            tvPanoramaStatus.text = getString(R.string.panorama_hint_start)
             portraitGuideLayout.isVisible = false
             bbProControlsContainer.isVisible = false
             isSquareMode = false
@@ -1905,21 +2087,7 @@ open class CameraActivity : AppCompatActivity(R.layout.activity_camera) {
             bbModeGridContainer.isVisible = false
             updateModeGridHighlight()
             updateOverlaysVisibility()
-            Toast.makeText(this, "Panoràmica: Mantingues el dispositiu anivellat", Toast.LENGTH_SHORT).show()
-        }
-
-        modeItemScanner.setOnClickListener {
-            isPortraitMode = false
-            isPanoramaMode = false
-            scannerReticleLayout.isVisible = true
-            panoramaGuideLayout.isVisible = false
-            portraitGuideLayout.isVisible = false
-            bbProControlsContainer.isVisible = false
-            viewModel.setCameraMode(CameraMode.QR)
-            bbModeGridContainer.isVisible = false
-            updateModeGridHighlight()
-            updateOverlaysVisibility()
-            Toast.makeText(this, "Escàner de documents i codis", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "Panoràmica: Prem disparador i gira lentament", Toast.LENGTH_SHORT).show()
         }
 
         // Live filter ribbon
@@ -1945,7 +2113,6 @@ open class CameraActivity : AppCompatActivity(R.layout.activity_camera) {
         ivModeIconPro.setBackgroundResource(if (isPro) R.drawable.bb_mode_icon_bg_selected else R.drawable.bb_mode_icon_bg)
         ivModeIconPortrait.setBackgroundResource(if (isPortraitMode) R.drawable.bb_mode_icon_bg_selected else R.drawable.bb_mode_icon_bg)
         ivModeIconPanorama.setBackgroundResource(if (isPanoramaMode) R.drawable.bb_mode_icon_bg_selected else R.drawable.bb_mode_icon_bg)
-        ivModeIconScanner.setBackgroundResource(if (currentMode == CameraMode.QR) R.drawable.bb_mode_icon_bg_selected else R.drawable.bb_mode_icon_bg)
 
         bbModeButton.setImageResource(
             when {
@@ -1953,7 +2120,6 @@ open class CameraActivity : AppCompatActivity(R.layout.activity_camera) {
                 isPanoramaMode -> R.drawable.ic_mode_pano
                 isPro -> R.drawable.ic_mode_pro
                 currentMode == CameraMode.VIDEO -> R.drawable.ic_mode_video
-                currentMode == CameraMode.QR -> R.drawable.ic_mode_scanner
                 else -> R.drawable.ic_mode_photo
             }
         )
@@ -2061,6 +2227,7 @@ open class CameraActivity : AppCompatActivity(R.layout.activity_camera) {
                 setPadding(8.px, 2.px, 8.px, 2.px)
                 setOnClickListener {
                     viewModel.setFlashMode(mode)
+                    viewModel.cameraController.flashMode = mode
                     btnBbFlash.setImageResource(iconRes)
                     llBbSubmenu.isVisible = false
                     updateOverlaysVisibility()
@@ -2684,8 +2851,6 @@ open class CameraActivity : AppCompatActivity(R.layout.activity_camera) {
             builder.setCaptureRequestOption(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_OFF)
             currentIso?.let { builder.setCaptureRequestOption(CaptureRequest.SENSOR_SENSITIVITY, it) }
             currentExposureNanos?.let { builder.setCaptureRequestOption(CaptureRequest.SENSOR_EXPOSURE_TIME, it) }
-        } else {
-            builder.setCaptureRequestOption(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_ON)
         }
         if (currentFocusDistance != null) {
             builder.setCaptureRequestOption(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_OFF)
@@ -2750,23 +2915,35 @@ open class CameraActivity : AppCompatActivity(R.layout.activity_camera) {
 
     private fun processSavedPhoto(uri: Uri) {
         try {
-            val bitmap = contentResolver.openInputStream(uri)?.use { inputStream ->
+            val transform = contentResolver.openInputStream(uri)?.use { inputStream ->
+                ExifUtils.getTransform(inputStream)
+            } ?: org.lineageos.aperture.models.Transform.DEFAULT
+
+            val rawBitmap = contentResolver.openInputStream(uri)?.use { inputStream ->
                 BitmapFactory.decodeStream(inputStream)
             } ?: return
 
-            var outputBitmap = bitmap
+            // Ensure upright orientation from EXIF so faces and documents align correctly
+            var outputBitmap = rawBitmap.transform(transform)
+            if (outputBitmap != rawBitmap) {
+                rawBitmap.recycle()
+            }
 
             // 1. Crop to square if in 1:1 mode, or 3:2 if in 3:2 mode
             if (isSquareMode) {
                 val size = minOf(outputBitmap.width, outputBitmap.height)
                 val x = (outputBitmap.width - size) / 2
                 val y = (outputBitmap.height - size) / 2
-                outputBitmap = Bitmap.createBitmap(outputBitmap, x, y, size, size)
+                val square = Bitmap.createBitmap(outputBitmap, x, y, size, size)
+                if (outputBitmap != rawBitmap) outputBitmap.recycle()
+                outputBitmap = square
             } else if (is3_2Mode) {
                 val targetHeight = (outputBitmap.width * 2) / 3
                 if (targetHeight <= outputBitmap.height) {
                     val y = (outputBitmap.height - targetHeight) / 2
-                    outputBitmap = Bitmap.createBitmap(outputBitmap, 0, y, outputBitmap.width, targetHeight)
+                    val cropped32 = Bitmap.createBitmap(outputBitmap, 0, y, outputBitmap.width, targetHeight)
+                    if (outputBitmap != rawBitmap) outputBitmap.recycle()
+                    outputBitmap = cropped32
                 }
             }
 
@@ -2780,9 +2957,7 @@ open class CameraActivity : AppCompatActivity(R.layout.activity_camera) {
                     val targetW = (outputBitmap.width * scale).toInt()
                     val targetH = (outputBitmap.height * scale).toInt()
                     val scaled = Bitmap.createScaledBitmap(outputBitmap, targetW, targetH, true)
-                    if (outputBitmap != bitmap) {
-                        outputBitmap.recycle()
-                    }
+                    if (outputBitmap != rawBitmap) outputBitmap.recycle()
                     outputBitmap = scaled
                 }
             }
@@ -2800,16 +2975,303 @@ open class CameraActivity : AppCompatActivity(R.layout.activity_camera) {
                     colorFilter = ColorMatrixColorFilter(filterMatrix)
                 }
                 canvas.drawBitmap(outputBitmap, 0f, 0f, paint)
+                if (outputBitmap != rawBitmap) outputBitmap.recycle()
                 outputBitmap = filtered
             }
 
-            // 4. Write back to URI
+            // 4. Portrait mode: apply optical bokeh background blur
+            if (isPortraitMode) {
+                val bokeh = applyPortraitBokeh(outputBitmap)
+                if (bokeh != outputBitmap) {
+                    if (outputBitmap != rawBitmap) outputBitmap.recycle()
+                    outputBitmap = bokeh
+                }
+            }
+
+            // 6. Write back upright to URI
             contentResolver.openOutputStream(uri, "wt")?.use { outputStream ->
                 outputBitmap.compress(Bitmap.CompressFormat.JPEG, 95, outputStream)
+            }
+            try {
+                contentResolver.openFileDescriptor(uri, "rw")?.use { pfd ->
+                    val exif = androidx.exifinterface.media.ExifInterface(pfd.fileDescriptor)
+                    exif.setAttribute(
+                        androidx.exifinterface.media.ExifInterface.TAG_ORIENTATION,
+                        androidx.exifinterface.media.ExifInterface.ORIENTATION_NORMAL.toString()
+                    )
+                    exif.saveAttributes()
+                }
+            } catch (e: Exception) {
+                Log.w(LOG_TAG, "Failed to update EXIF orientation attribute", e)
             }
         } catch (e: Exception) {
             Log.e(LOG_TAG, "Failed to post-process photo", e)
         }
+    }
+
+    private fun applyPortraitBokeh(inputBitmap: Bitmap): Bitmap {
+        try {
+            val width = inputBitmap.width
+            val height = inputBitmap.height
+            if (width < 100 || height < 100) return inputBitmap
+
+            var centerX = width * 0.5f
+            var centerY = height * 0.44f
+            var rx = width * 0.36f
+            var ry = height * 0.44f
+            var faceFound = false
+
+            try {
+                // Downscale for fast face detection (requires even width and RGB_565)
+                val targetW = 640
+                val targetH = ((height * targetW) / width) and 1.inv()
+                val detectorBitmap = Bitmap.createScaledBitmap(inputBitmap, targetW, targetH, true)
+                    .copy(Bitmap.Config.RGB_565, false)
+                if (detectorBitmap != null) {
+                    val faces = Array<FaceDetector.Face?>(3) { null }
+                    val faceCount = FaceDetector(targetW, targetH, 3).findFaces(detectorBitmap, faces)
+                    if (faceCount > 0 && faces[0] != null) {
+                        val midPoint = PointF()
+                        faces[0]!!.getMidPoint(midPoint)
+                        val scaleX = width.toFloat() / targetW
+                        val scaleY = height.toFloat() / targetH
+                        val faceX = midPoint.x * scaleX
+                        val faceY = midPoint.y * scaleY
+                        val eyesDist = faces[0]!!.eyesDistance() * scaleX
+
+                        centerX = faceX
+                        centerY = faceY + eyesDist * 0.4f
+                        rx = maxOf(eyesDist * 2.2f, width * 0.28f)
+                        ry = maxOf(eyesDist * 3.2f, height * 0.38f)
+                        faceFound = true
+                    }
+                    detectorBitmap.recycle()
+                }
+            } catch (e: Exception) {
+                Log.w(LOG_TAG, "Face detection fallback to central portrait subject", e)
+            }
+
+            // Creamy optical bokeh via 1/4-downscale + multi-pass stackBlur (Mario Klingemann)
+            val bw = maxOf(16, width / 4)
+            val bh = maxOf(16, height / 4)
+            val small = Bitmap.createScaledBitmap(inputBitmap, bw, bh, true)
+            val blurredSmall = small.stackBlur(18)
+            val blurred = Bitmap.createScaledBitmap(blurredSmall, width, height, true)
+            small.recycle()
+            blurredSmall.recycle()
+
+            // Create full-screen alpha mask
+            val maskBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+            val maskCanvas = Canvas(maskBitmap)
+
+            // Draw subject oval
+            val maskPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                val maxRadius = maxOf(rx, ry)
+                val gradient = RadialGradient(
+                    centerX, centerY, maxRadius,
+                    intArrayOf(Color.WHITE, Color.WHITE, Color.TRANSPARENT),
+                    floatArrayOf(0f, 0.65f, 1.0f),
+                    Shader.TileMode.CLAMP
+                )
+                shader = gradient
+            }
+
+            val saveCount = maskCanvas.save()
+            maskCanvas.translate(centerX, centerY)
+            maskCanvas.scale(1.0f, ry / rx)
+            maskCanvas.translate(-centerX, -centerY)
+            maskCanvas.drawCircle(centerX, centerY, rx, maskPaint)
+            maskCanvas.restoreToCount(saveCount)
+
+            // If face was found, also draw torso/shoulders oval down towards bottom
+            if (faceFound) {
+                val torsoY = (centerY + ry * 1.3f).coerceAtMost(height.toFloat())
+                val torsoRx = rx * 1.6f
+                val torsoRy = ry * 1.4f
+                val torsoPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    val maxRadius = maxOf(torsoRx, torsoRy)
+                    shader = RadialGradient(
+                        centerX, torsoY, maxRadius,
+                        intArrayOf(Color.WHITE, Color.WHITE, Color.TRANSPARENT),
+                        floatArrayOf(0f, 0.60f, 1.0f),
+                        Shader.TileMode.CLAMP
+                    )
+                }
+                val torsoSave = maskCanvas.save()
+                maskCanvas.translate(centerX, torsoY)
+                maskCanvas.scale(1.0f, torsoRy / torsoRx)
+                maskCanvas.translate(-centerX, -torsoY)
+                maskCanvas.drawCircle(centerX, torsoY, torsoRx, torsoPaint)
+                maskCanvas.restoreToCount(torsoSave)
+            }
+
+            // Create sharp subject layer with alpha mask applied across the ENTIRE canvas
+            val subjectLayer = inputBitmap.copy(Bitmap.Config.ARGB_8888, true)
+            val subjectCanvas = Canvas(subjectLayer)
+            val dstInPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                xfermode = PorterDuffXfermode(PorterDuff.Mode.DST_IN)
+            }
+            subjectCanvas.drawBitmap(maskBitmap, 0f, 0f, dstInPaint)
+            maskBitmap.recycle()
+
+            // Composite blurred background + sharp masked subject
+            val result = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+            val canvas = Canvas(result)
+            canvas.drawBitmap(blurred, 0f, 0f, null)
+            blurred.recycle()
+            canvas.drawBitmap(subjectLayer, 0f, 0f, null)
+            subjectLayer.recycle()
+
+            return result
+        } catch (e: Exception) {
+            Log.e(LOG_TAG, "Failed to apply portrait bokeh", e)
+            return inputBitmap
+        }
+    }
+
+    private fun startPanoramaSweep() {
+        if (isCapturingPanorama) return
+        val initialBitmap = viewFinder.bitmap ?: return
+        isCapturingPanorama = true
+
+        val frameW = initialBitmap.width
+        val frameH = initialBitmap.height
+        val maxPanoW = (frameW * 3.2f).toInt()
+
+        val panoBmp = Bitmap.createBitmap(maxPanoW, frameH, Bitmap.Config.ARGB_8888)
+        val panoCvs = Canvas(panoBmp)
+        panoCvs.drawBitmap(initialBitmap, 0f, 0f, null)
+        initialBitmap.recycle()
+
+        panoramaBitmap = panoBmp
+        panoramaCanvas = panoCvs
+        panoCurrentX = frameW / 2
+        panoAccumulatedAngle = 0f
+
+        pbPanoramaProgress.progress = 0
+        pbPanoramaProgress.isVisible = true
+        ivPanoramaThumb.isVisible = true
+        tvPanoramaStatus.text = getString(R.string.panorama_hint_sweeping)
+
+        gyroSensor?.let {
+            sensorManager?.registerListener(gyroListener, it, SensorManager.SENSOR_DELAY_GAME)
+        }
+
+        shutterButton.setImageResource(R.drawable.avd_video_recording_pause)
+
+        panoramaJob = lifecycleScope.launch(Dispatchers.Main) {
+            val stripWidth = (frameW * 0.14f).toInt().coerceAtLeast(16)
+            var lastStitchX = panoCurrentX
+
+            while (isCapturingPanorama) {
+                kotlinx.coroutines.delay(45)
+                val currentFrame = viewFinder.bitmap ?: continue
+
+                // Check gyro displacement or horizontal visual advancement
+                val deltaAngle = Math.abs(panoAccumulatedAngle)
+                val estimatedX = (frameW / 2 + (deltaAngle / 1.57f) * (maxPanoW - frameW)).toInt()
+                val targetX = estimatedX.coerceIn(panoCurrentX, maxPanoW - stripWidth)
+
+                if (targetX - lastStitchX >= 10) {
+                    val step = (targetX - lastStitchX).coerceAtMost(stripWidth)
+                    val srcLeft = (frameW - step) / 2
+                    val strip = Bitmap.createBitmap(currentFrame, srcLeft, 0, step, frameH)
+                    panoramaCanvas?.drawBitmap(strip, lastStitchX.toFloat(), 0f, null)
+                    strip.recycle()
+                    lastStitchX += step
+                    panoCurrentX = lastStitchX
+
+                    val progress = ((panoCurrentX.toFloat() / maxPanoW.toFloat()) * 100).toInt()
+                    pbPanoramaProgress.progress = progress
+
+                    val thumbW = 220.px
+                    val thumbH = 44.px
+                    if (thumbW > 0 && thumbH > 0) {
+                        ivPanoramaThumb.setImageBitmap(Bitmap.createScaledBitmap(panoBmp, thumbW, thumbH, true))
+                    }
+
+                    if (progress >= 96) {
+                        finishPanoramaSweep()
+                        break
+                    }
+                }
+                currentFrame.recycle()
+            }
+        }
+    }
+
+    private fun finishPanoramaSweep() {
+        if (!isCapturingPanorama) return
+        isCapturingPanorama = false
+        panoramaJob?.cancel()
+        gyroSensor?.let { sensorManager?.unregisterListener(gyroListener) }
+
+        pbPanoramaProgress.isVisible = false
+        ivPanoramaThumb.isVisible = false
+        tvPanoramaStatus.text = getString(R.string.panorama_hint_start)
+        shutterButton.setImageResource(R.drawable.avd_photo_capture)
+
+        val fullBmp = panoramaBitmap ?: return
+        val finalW = panoCurrentX.coerceIn(fullBmp.height, fullBmp.width)
+        val cropped = Bitmap.createBitmap(fullBmp, 0, 0, finalW, fullBmp.height)
+        fullBmp.recycle()
+        panoramaBitmap = null
+        panoramaCanvas = null
+
+        // Apply any active BB filter
+        var finalBmp = cropped
+        val filterMatrix = currentBbFilter.colorMatrix
+        if (filterMatrix != null) {
+            val filtered = Bitmap.createBitmap(finalW, cropped.height, Bitmap.Config.ARGB_8888)
+            val canvas = Canvas(filtered)
+            val paint = Paint().apply { colorFilter = ColorMatrixColorFilter(filterMatrix) }
+            canvas.drawBitmap(cropped, 0f, 0f, paint)
+            cropped.recycle()
+            finalBmp = filtered
+        }
+
+        // Save to MediaStore
+        lifecycleScope.launch(Dispatchers.IO) {
+            try {
+                val timestamp = System.currentTimeMillis()
+                val contentValues = ContentValues().apply {
+                    put(MediaStore.MediaColumns.DISPLAY_NAME, "PANO_${timestamp}.jpg")
+                    put(MediaStore.MediaColumns.MIME_TYPE, "image/jpeg")
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                        put(MediaStore.Images.Media.RELATIVE_PATH, "${Environment.DIRECTORY_DCIM}/Camera")
+                    }
+                    put(MediaStore.Images.Media.DATE_TAKEN, timestamp)
+                }
+                val uri = contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, contentValues)
+                if (uri != null) {
+                    contentResolver.openOutputStream(uri, "wt")?.use { out ->
+                        finalBmp.compress(Bitmap.CompressFormat.JPEG, 95, out)
+                    }
+                    runOnUiThread {
+                        onCapturedMedia(uri)
+                        Toast.makeText(this@CameraActivity, getString(R.string.panorama_saved), Toast.LENGTH_SHORT).show()
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e(LOG_TAG, "Failed to save panorama", e)
+            } finally {
+                finalBmp.recycle()
+            }
+        }
+    }
+
+    private fun cancelPanoramaSweep() {
+        if (!isCapturingPanorama) return
+        isCapturingPanorama = false
+        panoramaJob?.cancel()
+        gyroSensor?.let { sensorManager?.unregisterListener(gyroListener) }
+        pbPanoramaProgress.isVisible = false
+        ivPanoramaThumb.isVisible = false
+        tvPanoramaStatus.text = getString(R.string.panorama_hint_start)
+        shutterButton.setImageResource(R.drawable.avd_photo_capture)
+        panoramaBitmap?.recycle()
+        panoramaBitmap = null
+        panoramaCanvas = null
     }
 
     private suspend fun queueSetupWithCameraPermissions() {
@@ -2824,8 +3286,7 @@ open class CameraActivity : AppCompatActivity(R.layout.activity_camera) {
                 screenFlashView.setController(viewModel.cameraController)
                 screenFlashView.setScreenFlashWindow(window)
 
-                val videoRecordingAvailable = viewModel.isVideoRecordingAvailable()
-                if (viewModel.initialCameraMode == CameraMode.VIDEO && !videoRecordingAvailable) {
+                if (viewModel.initialCameraMode == CameraMode.VIDEO && !viewModel.isVideoRecordingAvailable()) {
                     // If an app asked for a video we have to bail out
                     if (viewModel.inSingleCaptureMode.value) {
                         Toast.makeText(
@@ -2887,12 +3348,17 @@ open class CameraActivity : AppCompatActivity(R.layout.activity_camera) {
             "Trying to rebind camera while camera is not in IDLE state"
         }
 
-        // Show blurred preview
-        previewBlurView.freeze()
-        previewBlurView.isVisible = true
+        if (hasBoundCameraOnce) {
+            // Show blurred preview
+            previewBlurView.freeze()
+            previewBlurView.isVisible = true
 
-        // Unbind previous use cases
-        viewModel.cameraController.unbind()
+            // Unbind previous use cases
+            viewModel.cameraController.unbind()
+        } else {
+            hasBoundCameraOnce = true
+            previewBlurView.isVisible = false
+        }
 
         // Hide grid until preview is ready
         gridView.alpha = 0f
@@ -2966,10 +3432,11 @@ open class CameraActivity : AppCompatActivity(R.layout.activity_camera) {
                         )
                     )
 
-                if (currentTargetResolution != null) {
+                val targetRes = currentTargetResolution
+                if (targetRes != null) {
                     resBuilder.setResolutionStrategy(
                         ResolutionStrategy(
-                            currentTargetResolution!!,
+                            targetRes,
                             ResolutionStrategy.FALLBACK_RULE_CLOSEST_HIGHER_THEN_LOWER
                         )
                     )
@@ -2986,10 +3453,16 @@ open class CameraActivity : AppCompatActivity(R.layout.activity_camera) {
                 val builtResSelector = resBuilder.build()
                 viewModel.cameraController.imageCaptureResolutionSelector = builtResSelector
 
-                CameraController.IMAGE_CAPTURE
+                viewModel.cameraController.setImageAnalysisAnalyzer(
+                    viewModel.cameraExecutor, viewModel.qrImageAnalyzer
+                )
+
+                CameraController.IMAGE_CAPTURE or CameraController.IMAGE_ANALYSIS
             }
 
             is CameraConfiguration.Video -> {
+                viewModel.cameraController.clearImageAnalysisAnalyzer()
+
                 // Check whether or not the video quality is supported
                 val videoQualityInfo = cameraConfiguration.camera.supportedVideoQualities[
                     cameraConfiguration.videoQuality
@@ -3040,7 +3513,7 @@ open class CameraActivity : AppCompatActivity(R.layout.activity_camera) {
                     viewModel.cameraExecutor, viewModel.qrImageAnalyzer
                 )
 
-                CameraController.IMAGE_ANALYSIS
+                CameraController.IMAGE_ANALYSIS or CameraController.IMAGE_CAPTURE
             }
         }
 
@@ -3103,6 +3576,8 @@ open class CameraActivity : AppCompatActivity(R.layout.activity_camera) {
                 .setHotPixelMode(camera2Options.hotPixelMode)
                 .build()
             )
+
+            viewModel.cameraController.flashMode = viewModel.flashMode.value
         }
 
         // Restore settings that can be set on the fly
@@ -3518,9 +3993,7 @@ open class CameraActivity : AppCompatActivity(R.layout.activity_camera) {
         keyCode: Int, event: KeyEvent?
     ): Boolean? {
         if (keyCode == KeyEvent.KEYCODE_SPACE || keyCode == KeyEvent.KEYCODE_ENTER || keyCode == KeyEvent.KEYCODE_NUMPAD_ENTER || keyCode == KeyEvent.KEYCODE_DPAD_CENTER) {
-            if (viewModel.cameraMode.value != CameraMode.QR
-                && viewModel.isShutterButtonEnabled.value
-            ) {
+            if (viewModel.isShutterButtonEnabled.value) {
                 shutterButton.performClick()
             }
             return true
@@ -3539,9 +4012,7 @@ open class CameraActivity : AppCompatActivity(R.layout.activity_camera) {
 
             when (gestureAction) {
                 GestureAction.SHUTTER -> {
-                    if (viewModel.cameraMode.value != CameraMode.QR
-                        && viewModel.isShutterButtonEnabled.value
-                    ) {
+                    if (viewModel.isShutterButtonEnabled.value) {
                         shutterButton.performClick()
                     }
                     true
