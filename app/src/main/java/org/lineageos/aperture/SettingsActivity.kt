@@ -23,11 +23,13 @@ import androidx.coordinatorlayout.widget.CoordinatorLayout
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.updatePadding
+import androidx.core.content.edit
 import androidx.lifecycle.lifecycleScope
 import androidx.preference.ListPreference
 import androidx.preference.Preference
 import androidx.preference.PreferenceCategory
 import androidx.preference.PreferenceFragmentCompat
+import androidx.preference.PreferenceManager
 import androidx.preference.SwitchPreference
 import com.google.android.material.appbar.AppBarLayout
 import com.google.android.material.appbar.MaterialToolbar
@@ -161,6 +163,20 @@ class SettingsActivity : AppCompatActivity(R.layout.activity_settings) {
         private val saveLocation by lazy { findPreference<SwitchPreference>("save_location") }
         private val shutterSound by lazy { findPreference<SwitchPreference>("shutter_sound") }
 
+        // Remember switches
+        private val rememberSettings by lazy {
+            findPreference<SwitchPreference>("remember_settings")!!
+        }
+        private val rememberFormatResolutionCaptureMode by lazy {
+            findPreference<SwitchPreference>("remember_format_resolution_capture_mode")!!
+        }
+        private val rememberHdr by lazy {
+            findPreference<SwitchPreference>("remember_hdr")!!
+        }
+        private val rememberGridStabilization by lazy {
+            findPreference<SwitchPreference>("remember_grid_stabilization")!!
+        }
+
         private val photoCaptureModePreferenceChangeListener =
             Preference.OnPreferenceChangeListener { preference, newValue ->
                 val currentPhotoCaptureMode = if (preference == photoCaptureMode) {
@@ -212,6 +228,9 @@ class SettingsActivity : AppCompatActivity(R.layout.activity_settings) {
             photoCaptureMode.onPreferenceChangeListener = photoCaptureModePreferenceChangeListener
             enableZsl.isEnabled = photoCaptureMode.value == "minimize_latency"
 
+            // Remember settings listeners
+            setupRememberListeners()
+
             // Check updates
             findPreference<Preference>("check_updates")?.apply {
                 summary = "v${BuildConfig.VERSION_NAME} — ${getString(R.string.bb_check_updates_summary)}"
@@ -231,6 +250,109 @@ class SettingsActivity : AppCompatActivity(R.layout.activity_settings) {
                     }
                     true
                 }
+            }
+        }
+
+        private var isUpdatingRemember = false
+
+        private fun setupRememberListeners() {
+            val prefs = PreferenceManager.getDefaultSharedPreferences(requireContext())
+
+            // Master switch: toggles all sub-switches
+            rememberSettings.onPreferenceChangeListener =
+                Preference.OnPreferenceChangeListener { _, newValue ->
+                    if (isUpdatingRemember) return@OnPreferenceChangeListener true
+                    isUpdatingRemember = true
+
+                    val enabled = newValue as Boolean
+                    rememberFormatResolutionCaptureMode.isChecked = enabled
+                    rememberHdr.isChecked = enabled
+                    rememberGridStabilization.isChecked = enabled
+
+                    if (!enabled) {
+                        resetAllRememberedValues(prefs)
+                    }
+
+                    isUpdatingRemember = false
+                    true
+                }
+
+            // Sub-switch: format, resolution, capture mode
+            rememberFormatResolutionCaptureMode.onPreferenceChangeListener =
+                Preference.OnPreferenceChangeListener { _, newValue ->
+                    if (isUpdatingRemember) return@OnPreferenceChangeListener true
+                    val enabled = newValue as Boolean
+                    if (!enabled) {
+                        resetFormatResolutionCaptureMode(prefs)
+                    }
+                    updateMasterSwitch()
+                    true
+                }
+
+            // Sub-switch: HDR
+            rememberHdr.onPreferenceChangeListener =
+                Preference.OnPreferenceChangeListener { _, newValue ->
+                    if (isUpdatingRemember) return@OnPreferenceChangeListener true
+                    val enabled = newValue as Boolean
+                    if (!enabled) {
+                        prefs.edit { putBoolean("use_photo_jpeg_ultra_hdr", true) }
+                    }
+                    updateMasterSwitch()
+                    true
+                }
+
+            // Sub-switch: grid and stabilization
+            rememberGridStabilization.onPreferenceChangeListener =
+                Preference.OnPreferenceChangeListener { _, newValue ->
+                    if (isUpdatingRemember) return@OnPreferenceChangeListener true
+                    val enabled = newValue as Boolean
+                    if (!enabled) {
+                        prefs.edit {
+                            putString("last_grid_mode", "off")
+                            putBoolean("video_stabilization", true)
+                        }
+                    }
+                    updateMasterSwitch()
+                    true
+                }
+        }
+
+        private fun updateMasterSwitch() {
+            if (isUpdatingRemember) return
+            isUpdatingRemember = true
+
+            val allSubEnabled = rememberFormatResolutionCaptureMode.isChecked &&
+                    rememberHdr.isChecked &&
+                    rememberGridStabilization.isChecked
+            if (rememberSettings.isChecked != allSubEnabled) {
+                rememberSettings.isChecked = allSubEnabled
+            }
+
+            isUpdatingRemember = false
+        }
+
+        private fun resetAllRememberedValues(prefs: android.content.SharedPreferences) {
+            prefs.edit {
+                putString("last_camera_facing", "back")
+                putString("last_camera_mode", "photo")
+                putString("last_grid_mode", "off")
+                putString("aspect_ratio", "4_3")
+                putString("photo_capture_mode", "minimize_latency")
+                putBoolean("enable_zsl", false)
+                putBoolean("use_photo_jpeg_ultra_hdr", true)
+                putBoolean("enable_raw_image_capture", false)
+                putBoolean("disable_jpeg_with_raw", false)
+                putBoolean("video_stabilization", true)
+            }
+        }
+
+        private fun resetFormatResolutionCaptureMode(prefs: android.content.SharedPreferences) {
+            prefs.edit {
+                putString("aspect_ratio", "4_3")
+                putString("photo_capture_mode", "minimize_latency")
+                putBoolean("enable_zsl", false)
+                putBoolean("enable_raw_image_capture", false)
+                putBoolean("disable_jpeg_with_raw", false)
             }
         }
     }

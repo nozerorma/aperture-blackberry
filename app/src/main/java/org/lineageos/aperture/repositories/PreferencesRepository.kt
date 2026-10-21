@@ -112,6 +112,94 @@ class PreferencesRepository(
     ).asPreferenceHolder()
 
     /**
+     * Whether all camera settings should be remembered across sessions.
+     */
+    val rememberSettings = primitivePreference(
+        key = "remember_settings",
+        defaultValue = true,
+    ).asPreferenceHolder()
+
+    /**
+     * Whether photo format, resolution and capture mode should be remembered.
+     */
+    val rememberFormatResolutionCaptureMode = primitivePreference(
+        key = "remember_format_resolution_capture_mode",
+        defaultValue = true,
+    ).asPreferenceHolder()
+
+    /**
+     * Whether HDR setting should be remembered.
+     */
+    val rememberHdr = primitivePreference(
+        key = "remember_hdr",
+        defaultValue = true,
+    ).asPreferenceHolder()
+
+    /**
+     * Whether grid mode and video stabilization should be remembered.
+     */
+    val rememberGridStabilization = primitivePreference(
+        key = "remember_grid_stabilization",
+        defaultValue = true,
+    ).asPreferenceHolder()
+
+    /**
+     * The last square (1:1) mode used.
+     */
+    val lastSquareMode = primitivePreference(
+        key = "last_square_mode",
+        defaultValue = false,
+    ).asPreferenceHolder()
+
+    /**
+     * The last 3:2 mode used.
+     */
+    val last3_2Mode = primitivePreference(
+        key = "last_3_2_mode",
+        defaultValue = false,
+    ).asPreferenceHolder()
+
+    /**
+     * The last photo resolution width used.
+     */
+    val lastPhotoResolutionWidth = primitivePreference<Int?>(
+        key = "last_photo_resolution_width",
+        defaultValue = null,
+    ).asPreferenceHolder()
+
+    /**
+     * The last photo resolution height used.
+     */
+    val lastPhotoResolutionHeight = primitivePreference<Int?>(
+        key = "last_photo_resolution_height",
+        defaultValue = null,
+    ).asPreferenceHolder()
+
+    /**
+     * The last HDR enabled state.
+     */
+    val lastHdrEnabled = primitivePreference(
+        key = "last_hdr_enabled",
+        defaultValue = false,
+    ).asPreferenceHolder()
+
+    /**
+     * The last HDR mode label ("HDR OFF", "HDR AUTO", "HDR ON").
+     */
+    val lastHdrMode = primitivePreference<String?>(
+        key = "last_hdr_mode",
+        defaultValue = null,
+    ).asPreferenceHolder()
+
+    /**
+     * The last BlackBerry filter used.
+     */
+    val lastBbFilter = primitivePreference<String?>(
+        key = "last_bb_filter",
+        defaultValue = null,
+    ).asPreferenceHolder()
+
+    /**
      * The last mic mode used.
      */
     val videoMicMode = primitivePreference(

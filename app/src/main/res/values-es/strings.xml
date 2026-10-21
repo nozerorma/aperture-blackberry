@@ -69,9 +69,20 @@
     <string name="qr_wifi_content_description">Añadir esta red Wi-Fi a la lista de redes conocidas y conectar el dispositivo a ella</string>
     <string name="title_activity_settings">Ajustes</string>
     <string name="general_header">General</string>
+    <string name="remember_header">Recordar al cerrar</string>
     <string name="photos_header">Fotos</string>
     <string name="video_header">Vídeo</string>
     <string name="advanced_header">Avanzado</string>
+
+    <!-- Preferencias de recordar -->
+    <string name="remember_settings_title">Recordar todo</string>
+    <string name="remember_settings_summary">Mantener todos los ajustes de cámara al cerrar la app</string>
+    <string name="remember_format_resolution_capture_mode_title">Formato, resolución y modo de disparo</string>
+    <string name="remember_format_resolution_capture_mode_summary">Recordar formato de foto, relación de aspecto y modo de captura</string>
+    <string name="remember_hdr_title">HDR</string>
+    <string name="remember_hdr_summary">Recordar el ajuste JPEG Ultra HDR</string>
+    <string name="remember_grid_stabilization_title">Cuadrícula y estabilizador</string>
+    <string name="remember_grid_stabilization_summary">Recordar la cuadrícula y la estabilización de vídeo</string>
     <string name="bright_screen_title">Pantalla brillante</string>
     <string name="bright_screen_summary" formatted="false">Bloquea el brillo al 100%</string>
     <string name="save_location_title">Guardar ubicación</string>

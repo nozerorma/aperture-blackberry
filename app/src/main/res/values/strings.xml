@@ -100,9 +100,20 @@
 
     <!-- Preference Titles -->
     <string name="general_header">General</string>
+    <string name="remember_header">Remember on close</string>
     <string name="photos_header">Photos</string>
     <string name="video_header">Video</string>
     <string name="advanced_header">Advanced</string>
+
+    <!-- Remember preferences -->
+    <string name="remember_settings_title">Remember everything</string>
+    <string name="remember_settings_summary">Keep all camera settings when the app is closed</string>
+    <string name="remember_format_resolution_capture_mode_title">Format, resolution and capture mode</string>
+    <string name="remember_format_resolution_capture_mode_summary">Remember photo format, aspect ratio and capture mode</string>
+    <string name="remember_hdr_title">HDR</string>
+    <string name="remember_hdr_summary">Remember JPEG Ultra HDR setting</string>
+    <string name="remember_grid_stabilization_title">Grid and stabilization</string>
+    <string name="remember_grid_stabilization_summary">Remember grid overlay and video stabilization</string>
 
     <!-- General Preferences -->
     <string name="bright_screen_title">Bright screen</string>

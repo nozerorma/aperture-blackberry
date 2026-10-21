@@ -930,6 +930,9 @@ class CameraViewModel(application: Application) : ApertureViewModel(application)
         )
 
     init {
+        // Reset remembered values to defaults if remember switches are off
+        resetRememberedValuesIfDisabled()
+
         viewModelScope.launch {
             launch {
                 flashMode.collectLatest { flashMode ->
@@ -970,6 +973,31 @@ class CameraViewModel(application: Application) : ApertureViewModel(application)
                     }
                 }
             }
+        }
+    }
+
+    /**
+     * Reset remembered values to their defaults when the corresponding
+     * remember switches are turned off.
+     */
+    private fun resetRememberedValuesIfDisabled() {
+        if (!preferencesRepository.rememberSettings.value) {
+            preferencesRepository.lastCameraFacing.value = CameraFacing.BACK
+            preferencesRepository.lastCameraMode.value = CameraMode.PHOTO
+        }
+        if (!preferencesRepository.rememberFormatResolutionCaptureMode.value) {
+            preferencesRepository.photoAspectRatio.value = AspectRatio.RATIO_4_3
+            preferencesRepository.photoCaptureMode.value = ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY
+            preferencesRepository.enableZsl.value = false
+            preferencesRepository.enableRawImageCapture.value = false
+            preferencesRepository.disableJpegWithRaw.value = false
+        }
+        if (!preferencesRepository.rememberHdr.value) {
+            preferencesRepository.usePhotoJpegUltraHdr.value = true
+        }
+        if (!preferencesRepository.rememberGridStabilization.value) {
+            preferencesRepository.lastGridMode.value = GridMode.OFF
+            preferencesRepository.videoStabilization.value = true
         }
     }
 
@@ -1268,7 +1296,9 @@ class CameraViewModel(application: Application) : ApertureViewModel(application)
             "Camera with facing $cameraFacing not available"
         )
 
-        preferencesRepository.lastCameraFacing.value = camera.cameraFacing
+        if (preferencesRepository.rememberSettings.value) {
+            preferencesRepository.lastCameraFacing.value = camera.cameraFacing
+        }
 
         emitEvent(Event.FlipCameraAnimation)
 
@@ -1296,7 +1326,9 @@ class CameraViewModel(application: Application) : ApertureViewModel(application)
                 return@updateConfiguration cameraConfiguration
             }
 
-            preferencesRepository.lastCameraMode.value = cameraMode
+            if (preferencesRepository.rememberSettings.value) {
+                preferencesRepository.lastCameraMode.value = cameraMode
+            }
 
             createInitialCameraConfiguration(
                 camera = camera,
@@ -1379,12 +1411,16 @@ class CameraViewModel(application: Application) : ApertureViewModel(application)
      */
     fun cycleGridMode() {
         gridMode.value.next()?.let {
-            preferencesRepository.lastGridMode.value = it
+            if (preferencesRepository.rememberGridStabilization.value) {
+                preferencesRepository.lastGridMode.value = it
+            }
         }
     }
 
     fun setGridMode(gridMode: GridMode) {
-        preferencesRepository.lastGridMode.value = gridMode
+        if (preferencesRepository.rememberGridStabilization.value) {
+            preferencesRepository.lastGridMode.value = gridMode
+        }
     }
 
     fun setLevelerEnabled(enabled: Boolean) {
@@ -1462,7 +1498,9 @@ class CameraViewModel(application: Application) : ApertureViewModel(application)
                 else -> AspectRatio.RATIO_4_3
             }
 
-            preferencesRepository.photoAspectRatio.value = newAspectRatio
+            if (preferencesRepository.rememberFormatResolutionCaptureMode.value) {
+                preferencesRepository.photoAspectRatio.value = newAspectRatio
+            }
 
             cameraConfiguration.copy(
                 photoAspectRatio = newAspectRatio,
@@ -1474,7 +1512,9 @@ class CameraViewModel(application: Application) : ApertureViewModel(application)
      */
     fun setPhotoAspectRatio(aspectRatio: Int) =
         updateConfiguration<CameraConfiguration.Photo> { cameraConfiguration ->
-            preferencesRepository.photoAspectRatio.value = aspectRatio
+            if (preferencesRepository.rememberFormatResolutionCaptureMode.value) {
+                preferencesRepository.photoAspectRatio.value = aspectRatio
+            }
 
             cameraConfiguration.copy(
                 photoAspectRatio = aspectRatio,
@@ -1493,8 +1533,10 @@ class CameraViewModel(application: Application) : ApertureViewModel(application)
         }
 
     fun setCaptureModePreference(mode: Int, zsl: Boolean) {
-        preferencesRepository.photoCaptureMode.value = mode
-        preferencesRepository.enableZsl.value = zsl
+        if (preferencesRepository.rememberFormatResolutionCaptureMode.value) {
+            preferencesRepository.photoCaptureMode.value = mode
+            preferencesRepository.enableZsl.value = zsl
+        }
     }
 
     fun getPhotoCaptureModePreference(): Int = preferencesRepository.photoCaptureMode.value

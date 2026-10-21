@@ -46,6 +46,40 @@
 
     <PreferenceCategory
         app:iconSpaceReserved="false"
+        app:title="@string/remember_header">
+
+        <SwitchPreference
+            app:defaultValue="true"
+            app:icon="@drawable/ic_tune"
+            app:key="remember_settings"
+            app:summary="@string/remember_settings_summary"
+            app:title="@string/remember_settings_title" />
+
+        <SwitchPreference
+            app:defaultValue="true"
+            app:icon="@drawable/ic_image"
+            app:key="remember_format_resolution_capture_mode"
+            app:summary="@string/remember_format_resolution_capture_mode_summary"
+            app:title="@string/remember_format_resolution_capture_mode_title" />
+
+        <SwitchPreference
+            app:defaultValue="true"
+            app:icon="@drawable/ic_hdr_on"
+            app:key="remember_hdr"
+            app:summary="@string/remember_hdr_summary"
+            app:title="@string/remember_hdr_title" />
+
+        <SwitchPreference
+            app:defaultValue="true"
+            app:icon="@drawable/ic_grid_3x3"
+            app:key="remember_grid_stabilization"
+            app:summary="@string/remember_grid_stabilization_summary"
+            app:title="@string/remember_grid_stabilization_title" />
+
+    </PreferenceCategory>
+
+    <PreferenceCategory
+        app:iconSpaceReserved="false"
         app:title="@string/photos_header">
 
         <ListPreference

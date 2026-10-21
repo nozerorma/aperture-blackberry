@@ -82,6 +82,7 @@ import androidx.camera.viewfinder.core.ZoomGestureDetector
 import androidx.cardview.widget.CardView
 import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.core.content.ContextCompat
+import androidx.core.content.edit
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -90,6 +91,7 @@ import androidx.core.view.children
 import androidx.core.view.isInvisible
 import androidx.core.view.isVisible
 import androidx.core.view.updateLayoutParams
+import androidx.preference.PreferenceManager
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
@@ -317,6 +319,123 @@ open class CameraActivity : AppCompatActivity(R.layout.activity_camera) {
     private var currentTargetResolution: Size? = null
     private var currentCaptureResolution: Size? = null
     private var currentResolutionLabel: String = "12 MP"
+
+    private val prefs by lazy { PreferenceManager.getDefaultSharedPreferences(this) }
+
+    private fun restoreRememberedState() {
+        val rememberAll = prefs.getBoolean("remember_settings", true)
+        val rememberFormat = prefs.getBoolean("remember_format_resolution_capture_mode", true)
+        val rememberHdr = prefs.getBoolean("remember_hdr", true)
+
+        if (rememberAll && rememberFormat) {
+            isSquareMode = prefs.getBoolean("last_square_mode", false)
+            is3_2Mode = prefs.getBoolean("last_3_2_mode", false)
+
+            val resW = prefs.getInt("last_photo_resolution_width", 0)
+            val resH = prefs.getInt("last_photo_resolution_height", 0)
+            if (resW > 0 && resH > 0) {
+                currentTargetResolution = Size(resW, resH)
+            }
+        }
+
+        if (rememberAll && rememberHdr) {
+            isHdrEnabled = prefs.getBoolean("last_hdr_enabled", false)
+            val hdrMode = prefs.getString("last_hdr_mode", null)
+            if (hdrMode != null) {
+                btnBbHdr.tag = hdrMode
+                btnBbHdr.setImageResource(
+                    when (hdrMode) {
+                        "HDR ON" -> R.drawable.ic_hdr_on_white_24dp
+                        "HDR AUTO" -> R.drawable.ic_hdr_auto_white_24dp
+                        else -> R.drawable.ic_hdr_off_white_24dp
+                    }
+                )
+            }
+        }
+
+        if (rememberAll) {
+            val filterName = prefs.getString("last_bb_filter", null)
+            if (filterName != null) {
+                runCatching { BbFilter.valueOf(filterName) }.getOrNull()?.let {
+                    currentBbFilter = it
+                    // Apply filter visual
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                        val effect = it.colorMatrix?.let { cm ->
+                            RenderEffect.createColorFilterEffect(ColorMatrixColorFilter(cm))
+                        }
+                        viewFinder.setRenderEffect(effect)
+                    }
+                    bbFilterButton.setImageResource(
+                        if (it == BbFilter.NONE) R.drawable.ic_filter_off_color_24dp
+                        else R.drawable.ic_filter_on_color_24dp
+                    )
+                }
+            }
+        }
+
+        // Update aspect ratio button icon
+        btnBbAspectRatio.setImageResource(
+            when {
+                isSquareMode -> R.drawable.ic_ratio_square_white_24dp
+                is3_2Mode -> R.drawable.ic_ratio_3_2_white_24dp
+                else -> if (currentSelectedRatio == AspectRatio.RATIO_16_9)
+                    R.drawable.ic_ratio_16_9_white_24dp
+                else
+                    R.drawable.ic_ratio_4_3_white_24dp
+            }
+        )
+    }
+
+    private fun saveAllRememberedState() {
+        saveAspectRatioState()
+        saveResolutionState()
+        saveHdrState()
+        saveFilterState()
+    }
+
+    private fun saveAspectRatioState() {
+        val rememberAll = prefs.getBoolean("remember_settings", true)
+        val rememberFormat = prefs.getBoolean("remember_format_resolution_capture_mode", true)
+        if (rememberAll && rememberFormat) {
+            prefs.edit {
+                putBoolean("last_square_mode", isSquareMode)
+                putBoolean("last_3_2_mode", is3_2Mode)
+            }
+        }
+    }
+
+    private fun saveResolutionState() {
+        val rememberAll = prefs.getBoolean("remember_settings", true)
+        val rememberFormat = prefs.getBoolean("remember_format_resolution_capture_mode", true)
+        if (rememberAll && rememberFormat) {
+            currentTargetResolution?.let { size ->
+                prefs.edit {
+                    putInt("last_photo_resolution_width", size.width)
+                    putInt("last_photo_resolution_height", size.height)
+                }
+            }
+        }
+    }
+
+    private fun saveHdrState() {
+        val rememberAll = prefs.getBoolean("remember_settings", true)
+        val rememberHdr = prefs.getBoolean("remember_hdr", true)
+        if (rememberAll && rememberHdr) {
+            prefs.edit {
+                putBoolean("last_hdr_enabled", isHdrEnabled)
+                putString("last_hdr_mode", btnBbHdr.tag as? String)
+            }
+        }
+    }
+
+    private fun saveFilterState() {
+        val rememberAll = prefs.getBoolean("remember_settings", true)
+        if (rememberAll) {
+            prefs.edit {
+                putString("last_bb_filter", currentBbFilter.name)
+            }
+        }
+    }
 
     private var currentIso: Int? = null
     private var currentExposureNanos: Long? = null
@@ -830,6 +949,8 @@ open class CameraActivity : AppCompatActivity(R.layout.activity_camera) {
             windowInsets
         }
 
+        restoreRememberedState()
+
         updateViewFinderFraming()
 
         // Set secondary top bar button callbacks
@@ -886,6 +1007,9 @@ open class CameraActivity : AppCompatActivity(R.layout.activity_camera) {
 
                     // Ensure flash/torch state is applied now that capture session is active
                     viewModel.cameraController.flashMode = viewModel.flashMode.value
+
+                    // Apply restored manual controls (HDR, ISO, exposure, etc.)
+                    updateManualControls()
 
                     // Issue capture if requested via assistant
                     if ((launchedViaVoiceIntent || assistantIntent?.cameraOpenOnly != null)
@@ -1076,6 +1200,7 @@ open class CameraActivity : AppCompatActivity(R.layout.activity_camera) {
 
     override fun onPause() {
         super.onPause()
+        saveAllRememberedState()
     }
 
     override fun onResume() {
@@ -1715,14 +1840,16 @@ open class CameraActivity : AppCompatActivity(R.layout.activity_camera) {
                     }
                 )
 
-                // Update BlackBerry Top Bar HDR button
-                btnBbHdr.setImageResource(
-                    when (photoEffect) {
-                        ExtensionMode.HDR -> R.drawable.ic_hdr_on_white_24dp
-                        ExtensionMode.AUTO -> R.drawable.ic_hdr_auto_white_24dp
-                        else -> R.drawable.ic_hdr_off_white_24dp
-                    }
-                )
+                // Update BlackBerry Top Bar HDR button (only if manual HDR is not active)
+                if (!isHdrEnabled) {
+                    btnBbHdr.setImageResource(
+                        when (photoEffect) {
+                            ExtensionMode.HDR -> R.drawable.ic_hdr_on_white_24dp
+                            ExtensionMode.AUTO -> R.drawable.ic_hdr_auto_white_24dp
+                            else -> R.drawable.ic_hdr_off_white_24dp
+                        }
+                    )
+                }
             }
         }
 
@@ -2224,6 +2351,7 @@ open class CameraActivity : AppCompatActivity(R.layout.activity_camera) {
                     is3_2Mode = opt.is3_2
                     updateViewFinderFraming()
                     btnBbAspectRatio.setImageResource(opt.iconRes)
+                    saveAspectRatioState()
 
                     // Ensure target resolution matches this format
                     val resList = getAvailableResolutions(opt.ratio, opt.isSquare, opt.is3_2)
@@ -2231,6 +2359,7 @@ open class CameraActivity : AppCompatActivity(R.layout.activity_camera) {
                     currentTargetResolution = def.size
                     currentCaptureResolution = def.captureSize
                     currentResolutionLabel = def.label
+                    saveResolutionState()
 
                     val underlyingRatio = if (opt.isSquare || opt.is3_2) AspectRatio.RATIO_4_3 else opt.ratio
                     viewModel.setPhotoAspectRatio(underlyingRatio)
@@ -2299,6 +2428,7 @@ open class CameraActivity : AppCompatActivity(R.layout.activity_camera) {
                     currentTargetResolution = opt.size
                     currentCaptureResolution = opt.captureSize
                     currentResolutionLabel = opt.label
+                    saveResolutionState()
                     viewModel.rebindCamera()
                     Toast.makeText(this@CameraActivity, "${opt.label} (${opt.mp})", Toast.LENGTH_SHORT).show()
                     showAspectRatioSubmenu()
@@ -2455,6 +2585,7 @@ open class CameraActivity : AppCompatActivity(R.layout.activity_camera) {
                 setOnClickListener {
                     isHdrEnabled = enabled
                     btnBbHdr.tag = label
+                    saveHdrState()
                     updateManualControls()
                     btnBbHdr.setImageResource(iconRes)
                     llBbSubmenu.isVisible = false
@@ -2776,6 +2907,7 @@ open class CameraActivity : AppCompatActivity(R.layout.activity_camera) {
 
     private fun applyFilter(filter: BbFilter) {
         currentBbFilter = filter
+        saveFilterState()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             val effect = filter.colorMatrix?.let {
                 RenderEffect.createColorFilterEffect(ColorMatrixColorFilter(it))
