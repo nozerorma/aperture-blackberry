@@ -92,6 +92,8 @@
     <string name="shutter_sound_summary">Reproducir un sonido al capturar</string>
     <string name="leveler_title">Nivelador</string>
     <string name="leveler_summary">Indicador que muestra la orientación del dispositivo</string>
+    <string name="split_touch_scroll_title">Scroll táctil dividido</string>
+    <string name="split_touch_scroll_summary">La mitad izquierda de la pantalla ajusta el zoom, la derecha ajusta la exposición</string>
     <string name="gestures_title">Gestos</string>
     <string name="single_buttons_title">Botones individuales</string>
     <string name="camera_button_action_title">Acción del botón de la cámara</string>

@@ -700,17 +700,28 @@ open class CameraActivity : AppCompatActivity(R.layout.activity_camera) {
                 if (zoomGestureDetectorIsInProgress) {
                     return false
                 }
-                // Vertical scroll to zoom: drag UP zooms in, drag DOWN zooms out
+                // Vertical scroll: left half = zoom, right half = exposure (if enabled)
                 if (abs(distanceY) > abs(distanceX) * 1.1f && abs(distanceY) > 2f) {
-                    val currentLinear = viewModel.zoomState.value?.linearZoom ?: 0f
+                    val splitEnabled = prefs.getBoolean("split_touch_scroll", true)
+                    val halfWidth = viewFinder.width / 2f
+                    val touchX = e1?.x ?: e2.x
+                    val isLeftSide = !splitEnabled || touchX < halfWidth
                     val viewFinderH = viewFinder.height.toFloat().coerceAtLeast(300f)
                     val delta = distanceY / (viewFinderH * 0.7f)
-                    val newLinear = (currentLinear + delta).coerceIn(0f, 1f)
-                    viewModel.cameraController.setLinearZoom(newLinear)
-                    zoomLevel.progress = newLinear
-                    zoomLevel.isVisible = true
-                    handler.removeMessages(MSG_HIDE_ZOOM_SLIDER)
-                    handler.sendMessageDelayed(handler.obtainMessage(MSG_HIDE_ZOOM_SLIDER), 2500)
+
+                    if (isLeftSide) {
+                        // Left side (or all): drag UP zooms in, drag DOWN zooms out
+                        val currentLinear = viewModel.zoomState.value?.linearZoom ?: 0f
+                        val newLinear = (currentLinear + delta).coerceIn(0f, 1f)
+                        viewModel.cameraController.setLinearZoom(newLinear)
+                        zoomLevel.progress = newLinear
+                        zoomLevel.isVisible = true
+                        handler.removeMessages(MSG_HIDE_ZOOM_SLIDER)
+                        handler.sendMessageDelayed(handler.obtainMessage(MSG_HIDE_ZOOM_SLIDER), 2500)
+                    } else {
+                        // Right side: drag UP = brighter, drag DOWN = darker
+                        adjustExposureByStep(delta * 2f)
+                    }
                     return true
                 }
                 return false

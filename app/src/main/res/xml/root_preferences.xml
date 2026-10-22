@@ -37,6 +37,13 @@
             app:summary="@string/leveler_summary"
             app:title="@string/leveler_title" />
 
+        <SwitchPreference
+            app:defaultValue="true"
+            app:icon="@drawable/ic_touch_app"
+            app:key="split_touch_scroll"
+            app:summary="@string/split_touch_scroll_summary"
+            app:title="@string/split_touch_scroll_title" />
+
         <Preference
             app:fragment="org.lineageos.aperture.SettingsActivity$GesturesSettingsFragment"
             app:icon="@drawable/ic_touch_app"

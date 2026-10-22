@@ -200,6 +200,14 @@ class PreferencesRepository(
     ).asPreferenceHolder()
 
     /**
+     * Whether split touch scroll is enabled (left = zoom, right = exposure).
+     */
+    val splitTouchScroll = primitivePreference(
+        key = "split_touch_scroll",
+        defaultValue = true,
+    ).asPreferenceHolder()
+
+    /**
      * The last mic mode used.
      */
     val videoMicMode = primitivePreference(
