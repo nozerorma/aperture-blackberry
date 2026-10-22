@@ -720,7 +720,11 @@ open class CameraActivity : AppCompatActivity(R.layout.activity_camera) {
                         handler.sendMessageDelayed(handler.obtainMessage(MSG_HIDE_ZOOM_SLIDER), 2500)
                     } else {
                         // Right side: drag UP = brighter, drag DOWN = darker
-                        adjustExposureByStep(delta * 2f)
+                        // Match zoom sensitivity: same finger travel = same proportional change
+                        val exposureRange = viewModel.currentCamera?.exposureCompensationRange
+                        val totalSteps = ((exposureRange?.endInclusive ?: 12) -
+                                (exposureRange?.start ?: -12)).toFloat().coerceAtLeast(8f)
+                        adjustExposureByStep(delta * totalSteps)
                     }
                     return true
                 }
